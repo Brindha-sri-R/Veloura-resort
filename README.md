@@ -1,4 +1,3 @@
-
 # VELOURA — Luxury Tropical Resort Booking Experience
 
 > *"Escape into the extraordinary."*
