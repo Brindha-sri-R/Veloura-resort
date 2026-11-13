@@ -201,7 +201,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-gold flex-shrink-0" />
-                <span>+1 (800) 555-VELOURA</span>
+                <span>+91 (22) 6123-8356 / 1800-123-VELOURA</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-gold flex-shrink-0" />

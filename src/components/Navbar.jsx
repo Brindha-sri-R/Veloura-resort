@@ -1,17 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Menu, X, Calendar, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Menu, X, Calendar, ArrowRight, User, LogOut, ChevronDown, Sparkles } from 'lucide-react';
 import { useBooking } from '../context/BookingContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { bookings } = useBooking();
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const userMenuRef = useRef(null);
+  const { bookings, showToast } = useBooking();
+  const { user, logout, openAuthModal } = useAuth();
   const location = useLocation();
 
   // Booking count (strictly derived from state/localStorage, never hardcoded)
   const savedBookingsCount = bookings ? bookings.length : 0;
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -115,8 +130,74 @@ export default function Navbar() {
               ))}
             </nav>
 
-            {/* 3. Desktop Actions Aligned to Right (My Bookings + Book CTA) */}
-            <div className="hidden lg:flex items-center gap-3 xl:gap-4 flex-shrink-0 whitespace-nowrap">
+            {/* 3. Desktop Actions Aligned to Right (Account + My Bookings + Book CTA) */}
+            <div className="hidden lg:flex items-center gap-2.5 xl:gap-3.5 flex-shrink-0 whitespace-nowrap">
+              {/* User Account Menu / Sign In */}
+              {user ? (
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className="inline-flex items-center gap-2 text-[11px] xl:text-xs tracking-wider uppercase text-forest-900 px-3 py-1.5 rounded-full border border-sand-300 hover:border-gold/60 bg-white/90 transition-all shadow-sm"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-forest-900 text-gold text-[10px] font-serif font-bold flex items-center justify-center">
+                      {user.name ? user.name.charAt(0).toUpperCase() : 'G'}
+                    </span>
+                    <span className="max-w-[100px] truncate font-medium">{user.name.split(' ')[0]}</span>
+                    <ChevronDown className={`w-3 h-3 text-gold transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <AnimatePresence>
+                    {userDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                        transition={{ duration: 0.18 }}
+                        className="absolute right-0 mt-2 w-56 bg-[#FAF7F2] rounded-2xl border border-sand-300 shadow-xl py-2 z-50 text-xs overflow-hidden"
+                      >
+                        <div className="px-4 py-2 border-b border-sand-300/80">
+                          <p className="text-[10px] uppercase tracking-wider text-gold-700 font-bold">Privileged Guest</p>
+                          <p className="font-serif text-sm font-semibold text-forest-950 truncate">{user.name}</p>
+                          <p className="text-[11px] text-forest-600 truncate">{user.email}</p>
+                        </div>
+
+                        <Link
+                          to="/my-bookings"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-forest-800 hover:bg-sand-200/60 hover:text-forest-950 transition-colors"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-gold-600" />
+                          <span>My Reservations ({savedBookingsCount})</span>
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserDropdownOpen(false);
+                            logout();
+                            showToast('Signed out of Veloura Sanctuary', 'info');
+                          }}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-rose-700 hover:bg-rose-50 transition-colors text-left"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>Sign Out</span>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('login')}
+                  className="group inline-flex items-center gap-1.5 text-[11px] xl:text-xs tracking-widest uppercase text-forest-800 hover:text-gold-700 px-3.5 py-2 rounded-full border border-sand-300 hover:border-gold/60 bg-white/80 hover:bg-white transition-all duration-300 whitespace-nowrap shadow-sm hover:shadow"
+                >
+                  <User className="w-3.5 h-3.5 text-gold flex-shrink-0 group-hover:scale-110 transition-transform" />
+                  <span>Sign In</span>
+                </button>
+              )}
+
               {/* My Bookings Button - Always displays actual saved count, shows 0 when none */}
               <Link
                 to="/my-bookings"
@@ -211,6 +292,45 @@ export default function Navbar() {
 
             {/* Navigation Links in Drawer */}
             <div className="py-6 space-y-1">
+              {/* User Account / Sign In within Mobile Drawer */}
+              {user ? (
+                <div className="p-3 mb-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-8 h-8 rounded-full bg-gold text-forest-950 font-serif font-bold text-xs flex items-center justify-center flex-shrink-0">
+                      {user.name ? user.name.charAt(0).toUpperCase() : 'G'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-serif text-white truncate">{user.name}</p>
+                      <p className="text-[10px] text-sand-300 truncate">{user.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setMobileMenuOpen(false);
+                      showToast('Signed out of Veloura Sanctuary', 'info');
+                    }}
+                    className="p-1.5 text-rose-300 hover:text-rose-100 transition-colors ml-2 flex-shrink-0"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuthModal('login');
+                  }}
+                  className="w-full flex items-center gap-2.5 text-sm font-serif text-gold hover:text-white py-2.5 px-3 mb-3 rounded-xl bg-white/5 border border-gold/30 transition-colors"
+                >
+                  <User className="w-4 h-4 text-gold" />
+                  <span>Sign In / Guest Privileges</span>
+                </button>
+              )}
+
               {navLinks.map((link) => (
                 <NavLink
                   key={link.name}

@@ -2,12 +2,14 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BookingProvider } from './context/BookingContext';
+import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
 import Toast from './components/Toast';
 import ScrollProgress from './components/ScrollProgress';
 import CustomCursor from './components/CustomCursor';
+import AuthModal from './components/AuthModal';
 
 import Home from './pages/Home';
 import Stays from './pages/Stays';
@@ -52,20 +54,23 @@ function AnimatedRoutes() {
 
 export default function App() {
   return (
-    <BookingProvider>
-      <Router>
-        <ScrollToTop />
-        <ScrollProgress />
-        <CustomCursor />
-        <div className="flex flex-col min-h-screen bg-[#F8F6F0] font-sans text-forest-950 antialiased selection:bg-gold selection:text-forest-950">
-          <Navbar />
-          <main className="flex-1 flex flex-col">
-            <AnimatedRoutes />
-          </main>
-          <Footer />
-          <Toast />
-        </div>
-      </Router>
-    </BookingProvider>
+    <AuthProvider>
+      <BookingProvider>
+        <Router>
+          <ScrollToTop />
+          <ScrollProgress />
+          <CustomCursor />
+          <div className="flex flex-col min-h-screen bg-[#F8F6F0] font-sans text-forest-950 antialiased selection:bg-gold selection:text-forest-950">
+            <Navbar />
+            <main className="flex-1 flex flex-col">
+              <AnimatedRoutes />
+            </main>
+            <Footer />
+            <Toast />
+            <AuthModal />
+          </div>
+        </Router>
+      </BookingProvider>
+    </AuthProvider>
   );
 }

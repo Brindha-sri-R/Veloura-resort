@@ -4,8 +4,10 @@ import { Search, Filter, SlidersHorizontal, RotateCcw, Sparkles } from 'lucide-r
 import StayCard from '../components/StayCard';
 import BookingSearch from '../components/BookingSearch';
 import { staysData, roomCategories } from '../data/staysData';
+import { useBooking } from '../context/BookingContext';
 
 export default function Stays() {
+  const { stays } = useBooking();
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'All Stays';
   const initialGuests = parseInt(searchParams.get('guests')) || 0;
@@ -15,8 +17,10 @@ export default function Stays() {
   const [minGuests, setMinGuests] = useState(initialGuests);
   const [sortBy, setSortBy] = useState('recommended');
 
+  const sourceStays = stays && stays.length > 0 ? stays : staysData;
+
   const filteredStays = useMemo(() => {
-    return staysData
+    return sourceStays
       .filter((stay) => {
         // Category filter
         if (selectedCategory !== 'All Stays' && stay.category !== selectedCategory) {

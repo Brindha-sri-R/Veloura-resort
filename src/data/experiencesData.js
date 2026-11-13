@@ -45,7 +45,7 @@ export const experiencesData = [
     tag: 'Bespoke Sailing',
     duration: '3.5 Hours',
     location: 'Outer Atoll Waters',
-    price: 'From $450 / Experience',
+    price: 'From ₹22,500 / Experience',
     image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80',
     description: 'Step aboard our hand-crafted 65-foot teak sailing yacht. As the equator sun melts into hues of amber, rose, and violet, glide past wild spinner dolphin pods while savoring Krug Champagne and fresh canapés.',
     highlights: [
@@ -83,7 +83,7 @@ export const experiencesData = [
     tag: 'Ultimate Privacy',
     duration: 'Half Day (4 Hours)',
     location: 'Coral Key Sandbank (15 mins by speedboat)',
-    price: '$680 / Couple',
+    price: '₹35,000 / Couple',
     image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
     description: 'Be whisked away by private wooden launch to an uninhabited white sandbank surrounded solely by endless turquoise sea. Enjoy a shaded linen tent, chilled vintage wines, and a gourmet seafood hamper.',
     highlights: [
@@ -102,7 +102,7 @@ export const experiencesData = [
     tag: 'Culture & Craft',
     duration: '2.5 Hours',
     location: 'Veloura Organic Plantation',
-    price: '$180 / Person',
+    price: '₹9,500 / Person',
     image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80',
     description: 'Stroll through our 5-acre heritage spice gardens with the head horticulturist. Hand-pick lemongrass, turmeric, kaffir lime, and wild herbs before crafting fragrant local curries under an open-air clay pavilion.',
     highlights: [

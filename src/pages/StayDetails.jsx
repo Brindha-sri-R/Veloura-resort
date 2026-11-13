@@ -12,9 +12,10 @@ import { formatCurrency, calculateNights, getTodayDateString } from '../utils/fo
 export default function StayDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { setSelectedStay, searchParams, updateSearchParams, showToast } = useBooking();
+  const { setSelectedStay, searchParams, updateSearchParams, showToast, stays } = useBooking();
 
-  const stay = staysData.find((s) => s.id === id) || staysData[0];
+  const stayList = stays && stays.length > 0 ? stays : staysData;
+  const stay = stayList.find((s) => s.id === id || s.slug === id) || stayList[0];
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);

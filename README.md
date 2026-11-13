@@ -82,13 +82,16 @@ VELOURA translates the architectural language of high-end boutique hospitality (
 
 | Layer | Technology |
 |---|---|
-| **Framework** | [React 18](https://react.dev/) |
-| **Build Tool** | [Vite 6](https://vitejs.dev/) |
+| **Frontend Framework** | [React 18](https://react.dev/) |
+| **Build Tool & Proxy** | [Vite 6](https://vitejs.dev/) |
 | **Routing** | [React Router DOM v6](https://reactrouter.com/) |
 | **Styling** | [Tailwind CSS 3](https://tailwindcss.com/) |
 | **Animation** | [Framer Motion 11](https://www.framer.com/motion/) |
 | **Icons** | [Lucide React](https://lucide.dev/) |
-| **State** | React Context API (`BookingContext`) + `LocalStorage` |
+| **Backend Framework** | [Node.js](https://nodejs.org/) & [Express.js](https://expressjs.com/) |
+| **Database** | [MongoDB Atlas](https://www.mongodb.com/atlas) with [Mongoose](https://mongoosejs.com/) |
+| **Authentication** | JSON Web Tokens ([JWT](https://jwt.io/)) & [bcryptjs](https://www.npmjs.com/package/bcryptjs) |
+| **Payment Gateway** | [Razorpay](https://razorpay.com/) (Cards, NetBanking, UPI, International) + Express Demo Mode |
 
 ---
 
@@ -161,17 +164,35 @@ Veloura/
    npm install
    ```
 
-### Running Locally
+### Running Locally (Full-Stack)
 
-Start the Vite development server:
+The application consists of two communicating servers:
+1. **Frontend (Vite)**: Runs on `http://localhost:3000` with an automatic proxy forwarding `/api/*` to `http://localhost:5000`.
+2. **Backend (Express)**: Runs on `http://localhost:5000` connected to MongoDB Atlas.
+
+#### Step 1: Start the Backend Server
+```bash
+cd server
+npm run dev
+```
+*The server will start with nodemon and connect to your MongoDB Atlas cluster.*
+
+To re-seed the 6 luxury residences into MongoDB Atlas at any time:
+```bash
+npm run seed
+```
+
+To run the automated backend test suite:
+```bash
+npm run test
+```
+
+#### Step 2: Start the Frontend Client
+In a separate terminal window at the project root (`Veloura/`):
 ```bash
 npm run dev
 ```
-
-The application will be accessible at:
-```text
-http://127.0.0.1:3000/
-```
+Open **`http://localhost:3000`** in your browser. All sanctuary stays, user authentication, and reservations sync directly with MongoDB Atlas!
 
 ### Building for Production
 

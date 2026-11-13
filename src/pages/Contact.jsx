@@ -87,7 +87,7 @@ export default function Contact() {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Lord Alexander Wright"
+                      placeholder="e.g. Vikram Singhania"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-4 py-3 rounded-xl border border-sand-300 text-sm focus:outline-none focus:border-gold bg-sand-50/50"
@@ -101,7 +101,7 @@ export default function Contact() {
                     <input
                       type="email"
                       required
-                      placeholder="e.g. alexander@wright.com"
+                      placeholder="e.g. vikram@singhania.in"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full px-4 py-3 rounded-xl border border-sand-300 text-sm focus:outline-none focus:border-gold bg-sand-50/50"
@@ -116,7 +116,7 @@ export default function Contact() {
                     </label>
                     <input
                       type="tel"
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="+91 98765 43210"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full px-4 py-3 rounded-xl border border-sand-300 text-sm focus:outline-none focus:border-gold bg-sand-50/50"
@@ -203,8 +203,8 @@ export default function Contact() {
                   <Phone className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
                   <div>
                     <span className="font-medium text-white block">VIP Concierge Telephone</span>
-                    <span>+1 (800) 555-VELOURA (Toll Free)</span>
-                    <span className="block text-sand-400 mt-0.5">+1 (800) 555-8356 (International)</span>
+                    <span>1800-123-VELOURA (Toll Free India)</span>
+                    <span className="block text-sand-400 mt-0.5">+91 (22) 6123-8356 (Direct Desk)</span>
                   </div>
                 </div>
 

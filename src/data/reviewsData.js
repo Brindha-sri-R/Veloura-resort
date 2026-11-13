@@ -45,8 +45,8 @@ export const reviewsData = [
   },
   {
     id: 5,
-    name: 'Harrison & Sofia Sterling',
-    origin: 'New York, United States',
+    name: 'Aarav & Meera Singhania',
+    origin: 'Mumbai, India',
     stayType: 'Oceanfront Villa • 5 Nights',
     rating: 5,
     date: 'March 2026',
