@@ -19,100 +19,53 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serverless Mongoose connection caching
 let cached = global.mongoose;
 if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null, lastError: null };
+  cached = global.mongoose = { conn: null, promise: null };
 }
 
-const connectDB = async () => {
+async function connectDB() {
   if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
   const mongoUri = process.env.MONGO_URI;
   if (!mongoUri) {
-    cached.lastError = 'MONGO_URI environment variable is not defined on Vercel.';
-    return null;
+    throw new Error('MONGO_URI is not defined in environment variables.');
   }
 
   if (!cached.promise) {
-    const opts = {
-      bufferCommands: false, // Prevents 10-second buffering timeout when disconnected
-      serverSelectionTimeoutMS: 6000,
-      connectTimeoutMS: 8000
-    };
-
-    cached.promise = mongoose.connect(mongoUri, opts)
-      .then((m) => {
-        cached.lastError = null;
-        return m;
-      })
-      .catch((err) => {
-        cached.promise = null;
-        cached.lastError = err.message;
-        console.error('MongoDB Atlas connection error in Vercel function:', err.message);
-        throw err;
-      });
+    cached.promise = mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 10000
+    }).then(m => m);
   }
 
   try {
     cached.conn = await cached.promise;
-  } catch (err) {
+  } catch (e) {
     cached.promise = null;
-    cached.conn = null;
+    throw e;
   }
 
   return cached.conn;
-};
+}
 
-// Middleware: connect DB before handling requests
+// Connect to MongoDB Atlas for each incoming request
 app.use(async (req, res, next) => {
-  // Allow health check to run even if DB is still connecting
-  if (req.path === '/api/health' || req.path === '/health') {
-    await connectDB().catch(() => {});
-    return next();
-  }
-
   try {
     await connectDB();
-    if (mongoose.connection.readyState !== 1) {
-      const reason = !process.env.MONGO_URI
-        ? 'MONGO_URI is missing in Vercel Environment Variables.'
-        : cached.lastError
-        ? `Database connection error: ${cached.lastError}`
-        : 'Database is still establishing connection or IP is blocked by Atlas.';
-
-      return res.status(503).json({
-        success: false,
-        message: `${reason} Ensure 0.0.0.0/0 is whitelisted in MongoDB Atlas Network Access.`,
-        code: 'DB_DISCONNECTED'
-      });
-    }
-  } catch (err) {
-    return res.status(503).json({
+    next();
+  } catch (error) {
+    console.error('Database connection error in Vercel function:', error.message);
+    res.status(500).json({
       success: false,
-      message: `Database connection failed: ${err.message}. Please ensure 0.0.0.0/0 is whitelisted in MongoDB Atlas.`,
-      code: 'DB_CONNECTION_ERROR'
+      message: `Database connection error: ${error.message}`
     });
   }
-
-  next();
 });
 
-// Enhanced health route with diagnostics
-app.get('/api/health', (req, res) => {
-  const isConnected = mongoose.connection.readyState === 1;
-  res.status(200).json({
-    success: true,
-    message: 'Veloura API is running',
-    database: isConnected ? 'connected' : 'disconnected',
-    hasMongoUri: Boolean(process.env.MONGO_URI),
-    lastError: cached.lastError,
-    timestamp: new Date().toISOString()
-  });
-});
-
+app.use('/api/health', healthRoutes);
 app.use('/api/stays', stayRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
