@@ -82,6 +82,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload)
   }),
+  appleLogin: (payload) => apiRequest('/auth/apple', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
   getMe: () => apiRequest('/auth/me'),
   updateMe: (payload) => apiRequest('/auth/me', {
     method: 'PUT',

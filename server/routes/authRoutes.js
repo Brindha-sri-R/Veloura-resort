@@ -1,5 +1,12 @@
 import express from 'express';
-import { registerUser, loginUser, googleLogin, getUserProfile, updateUserProfile } from '../controllers/authController.js';
+import { 
+  registerUser, 
+  loginUser, 
+  googleLogin, 
+  appleLogin, 
+  getUserProfile, 
+  updateUserProfile 
+} from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -7,6 +14,7 @@ const router = express.Router();
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/google', googleLogin);
+router.post('/apple', appleLogin);
 router.get('/me', protect, getUserProfile);
 router.put('/me', protect, updateUserProfile);
 

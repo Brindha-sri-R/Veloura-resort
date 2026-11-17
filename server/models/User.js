@@ -20,12 +20,17 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: function() {
-      return !this.googleId && this.authProvider !== 'google';
+      return !this.googleId && !this.appleId && this.authProvider === 'local';
     },
     minlength: [6, 'Password must be at least 6 characters'],
     select: false // Do not return password by default in queries
   },
   googleId: {
+    type: String,
+    default: null,
+    sparse: true
+  },
+  appleId: {
     type: String,
     default: null,
     sparse: true
@@ -36,7 +41,7 @@ const userSchema = new mongoose.Schema({
   },
   authProvider: {
     type: String,
-    enum: ['local', 'google'],
+    enum: ['local', 'google', 'apple'],
     default: 'local'
   },
   phone: {

@@ -1,36 +1,65 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Mail, User, Phone, Globe, Sparkles, ArrowRight, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { X, Lock, Mail, User, Phone, Globe, Sparkles, ArrowRight, AlertCircle, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { useAuth, getLoginHistory, removeSavedAccount } from '../context/AuthContext';
 import { useBooking } from '../context/BookingContext';
 import { isValidIndianPhone } from '../utils/formatters';
 
 export default function AuthModal() {
-  const { isAuthModalOpen, closeAuthModal, authModalTab, setAuthModalTab, login, register, googleLogin } = useAuth();
+  const { 
+    isAuthModalOpen, 
+    closeAuthModal, 
+    authModalTab, 
+    setAuthModalTab, 
+    login, 
+    register, 
+    googleLogin, 
+    appleLogin 
+  } = useAuth();
   const { showToast } = useBooking();
 
+  // Primary form state - completely clean and blank for every new user
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('India');
 
+  // Async & UI state
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showGoogleChooser, setShowGoogleChooser] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [customGoogleName, setCustomGoogleName] = useState('');
 
-  const googleButtonRef = useRef(null);
+  // Social authentication views: null | 'google' | 'apple'
+  const [socialMode, setSocialMode] = useState(null);
+  const [socialEmail, setSocialEmail] = useState('');
+  const [socialName, setSocialName] = useState('');
 
-  // Reset form when modal opens or tab changes
+  // Login history stored strictly on this device
+  const [historyState, setHistoryState] = useState({});
+
+  // Refresh login history whenever modal opens
+  const refreshHistory = () => {
+    try {
+      const hist = getLoginHistory();
+      setHistoryState(hist || {});
+    } catch {
+      setHistoryState({});
+    }
+  };
+
+  // Reset form and view state on modal open or tab change
   useEffect(() => {
     setErrorMessage('');
-    setShowGoogleChooser(false);
+    setSocialMode(null);
+    setSocialEmail('');
+    setSocialName('');
+    if (isAuthModalOpen) {
+      refreshHistory();
+    }
   }, [authModalTab, isAuthModalOpen]);
 
-  // Load Google Identity Services script if not already present
+  // Load Google Identity Services script if configured
   useEffect(() => {
     if (window.google?.accounts?.id) return;
     const script = document.createElement('script');
@@ -38,17 +67,14 @@ export default function AuthModal() {
     script.async = true;
     script.defer = true;
     document.body.appendChild(script);
-    return () => {
-      // Keep script cached in document
-    };
   }, []);
 
   // Handle ESC key press
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isAuthModalOpen) {
-        if (showGoogleChooser) {
-          setShowGoogleChooser(false);
+        if (socialMode) {
+          setSocialMode(null);
         } else {
           closeAuthModal();
         }
@@ -56,20 +82,34 @@ export default function AuthModal() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAuthModalOpen, showGoogleChooser, closeAuthModal]);
+  }, [isAuthModalOpen, socialMode, closeAuthModal]);
 
   if (!isAuthModalOpen) return null;
 
-  // Handle Google Sign-In
-  const handleGoogleSignIn = async () => {
-    setErrorMessage('');
-    setGoogleLoading(true);
+  // Filter accounts used on this specific device that have logged in at least 2 times
+  // 1st time users or users with < 2 logins see zero saved emails
+  const eligibleAccounts = Object.values(historyState).filter(
+    (acc) => (acc.loginCount || 0) >= 2
+  );
 
+  const handleRemoveAccount = (targetEmail) => {
+    removeSavedAccount(targetEmail);
+    refreshHistory();
+    if (email.toLowerCase().trim() === targetEmail.toLowerCase().trim()) {
+      setEmail('');
+      setPassword('');
+    }
+  };
+
+  // Google Sign-In trigger
+  const handleGoogleClick = async () => {
+    setErrorMessage('');
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-    // If real Google Client ID is configured and GIS loaded, try real Google Prompt
+    // If official Google Client ID configured, try Google One-Tap / Prompt
     if (googleClientId && window.google?.accounts?.id) {
       try {
+        setSocialLoading(true);
         window.google.accounts.id.initialize({
           client_id: googleClientId,
           callback: async (response) => {
@@ -80,7 +120,7 @@ export default function AuthModal() {
               } catch (err) {
                 setErrorMessage(err.message || 'Google sign-in failed.');
               } finally {
-                setGoogleLoading(false);
+                setSocialLoading(false);
               }
             }
           }
@@ -88,52 +128,103 @@ export default function AuthModal() {
 
         window.google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // Fallback to seamless Google chooser
-            setShowGoogleChooser(true);
-            setGoogleLoading(false);
+            setSocialMode('google');
+            setSocialLoading(false);
           }
         });
         return;
       } catch (err) {
-        console.warn('Google One Tap init fallback:', err);
+        console.warn('Google One Tap fallback:', err);
       }
     }
 
-    // Default seamless luxury Google chooser for immediate sign-in
-    setShowGoogleChooser(true);
-    setGoogleLoading(false);
+    // Default seamless Google authentication view
+    setSocialMode('google');
   };
 
-  // Process chosen Google profile
-  const handleChooseGoogleAccount = async (profile) => {
-    setGoogleLoading(true);
+  // Apple ID trigger
+  const handleAppleClick = () => {
     setErrorMessage('');
-    try {
-      const res = await googleLogin({ profile });
-      showToast(`Welcome to Veloura, ${res.user.name}. Signed in with Google.`);
-      setShowGoogleChooser(false);
-    } catch (err) {
-      setErrorMessage(err.message || 'Google authentication failed.');
-    } finally {
-      setGoogleLoading(false);
-    }
+    setSocialMode('apple');
   };
 
-  const handleCustomGoogleSubmit = async (e) => {
+  // Social account submission handler
+  const handleSocialSubmit = async (e) => {
     e.preventDefault();
-    if (!customGoogleEmail.trim() || !customGoogleEmail.includes('@')) {
-      setErrorMessage('Please provide a valid Google email address.');
+    setErrorMessage('');
+
+    if (!socialEmail.trim() || !socialEmail.includes('@')) {
+      setErrorMessage(`Please enter a valid ${socialMode === 'google' ? 'Google' : 'Apple ID'} email address.`);
       return;
     }
-    const profileName = customGoogleName.trim() || customGoogleEmail.split('@')[0];
-    await handleChooseGoogleAccount({
-      name: profileName,
-      email: customGoogleEmail.trim().toLowerCase(),
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(profileName)}&background=123D35&color=C5A77A`,
-      googleId: `google_sim_${Date.now()}`
-    });
+
+    setSocialLoading(true);
+    const providerName = socialName.trim() || socialEmail.split('@')[0];
+    const emailNorm = socialEmail.trim().toLowerCase();
+
+    try {
+      if (socialMode === 'google') {
+        const res = await googleLogin({
+          profile: {
+            name: providerName,
+            email: emailNorm,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(providerName)}&background=123D35&color=C5A77A`,
+            googleId: `google_direct_${Date.now()}`
+          }
+        });
+        showToast(`Welcome, ${res.user.name}. Signed in with Google.`);
+      } else {
+        const res = await appleLogin({
+          profile: {
+            name: providerName,
+            email: emailNorm,
+            appleId: `apple_direct_${Date.now()}`
+          }
+        });
+        showToast(`Welcome, ${res.user.name}. Signed in with Apple ID.`);
+      }
+      setSocialMode(null);
+    } catch (err) {
+      setErrorMessage(err.message || `${socialMode === 'google' ? 'Google' : 'Apple ID'} sign-in failed.`);
+    } finally {
+      setSocialLoading(false);
+    }
   };
 
+  // Quick sign in for a saved returning account (loginCount >= 2)
+  const handleSelectReturningSocial = async (acc, provider) => {
+    setSocialLoading(true);
+    setErrorMessage('');
+    try {
+      if (provider === 'google') {
+        const res = await googleLogin({
+          profile: {
+            name: acc.name,
+            email: acc.email,
+            avatar: acc.avatar,
+            googleId: `google_quick_${Date.now()}`
+          }
+        });
+        showToast(`Welcome back, ${res.user.name}. Signed in with Google.`);
+      } else {
+        const res = await appleLogin({
+          profile: {
+            name: acc.name,
+            email: acc.email,
+            appleId: `apple_quick_${Date.now()}`
+          }
+        });
+        showToast(`Welcome back, ${res.user.name}. Signed in with Apple ID.`);
+      }
+      setSocialMode(null);
+    } catch (err) {
+      setErrorMessage(err.message || 'Authentication failed. Please try again.');
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  // Primary email & password submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -186,15 +277,15 @@ export default function AuthModal() {
           onClick={closeAuthModal}
         />
 
-        {/* Modal Window */}
+        {/* Modal Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 16 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-lg bg-[#FAF7F2] rounded-3xl border border-sand-300 shadow-2xl p-6 sm:p-8 z-10 overflow-hidden my-auto"
+          className="relative w-full max-w-md bg-[#FAF7F2] rounded-3xl border border-sand-300 shadow-2xl p-6 sm:p-8 z-10 overflow-hidden my-auto"
         >
-          {/* Subtle Decorative Background Seal */}
+          {/* Subtle Ambient Glow */}
           <div className="absolute -top-12 -right-12 w-44 h-44 rounded-full bg-gold/5 blur-2xl pointer-events-none" />
 
           {/* Close Button */}
@@ -209,125 +300,116 @@ export default function AuthModal() {
 
           {/* Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-luxury text-gold-600 font-semibold mb-2">
+            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-luxury text-gold-600 font-semibold mb-1.5">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Veloura Guest Sanctuary</span>
             </div>
             <h3 className="font-serif text-2xl sm:text-3xl text-forest-950 font-normal">
-              {showGoogleChooser
+              {socialMode === 'google'
                 ? 'Sign in with Google'
+                : socialMode === 'apple'
+                ? 'Sign in with Apple ID'
                 : authModalTab === 'login'
                 ? 'Sign In to Your Itinerary'
                 : 'Create Guest Privilege Account'}
             </h3>
-            <p className="mt-1.5 text-xs text-forest-700/80 font-sans">
-              {showGoogleChooser
-                ? 'Choose a Google account to continue to Veloura Luxury Resort.'
+            <p className="mt-1 text-xs text-forest-700/80 font-sans">
+              {socialMode === 'google'
+                ? 'Enter your Google account details to proceed seamlessly.'
+                : socialMode === 'apple'
+                ? 'Enter your Apple ID to connect with Veloura.'
                 : authModalTab === 'login'
-                ? 'Access your private reservations, concierge notes, and sanctuary preferences.'
-                : 'Enjoy effortless reservation management and bespoke island host arrangements.'}
+                ? 'Access your private reservations and sanctuary preferences.'
+                : 'Enjoy effortless reservation management and island privileges.'}
             </p>
           </div>
 
-          {/* Google Account Chooser View */}
-          {showGoogleChooser ? (
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* SOCIAL VIEW (Google or Apple ID) */}
+          {socialMode ? (
             <div className="space-y-4">
-              <div className="space-y-2.5">
+              {/* Show only returning accounts on THIS device (2+ logins) for this provider */}
+              {eligibleAccounts.filter(
+                (acc) => acc.authProvider === socialMode || (!acc.authProvider && socialMode === 'google')
+              ).length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase tracking-wider text-forest-600 font-semibold block">
+                    Previously Used on this Device
+                  </span>
+                  {eligibleAccounts
+                    .filter((acc) => acc.authProvider === socialMode || (!acc.authProvider && socialMode === 'google'))
+                    .map((acc) => (
+                      <button
+                        key={acc.email}
+                        type="button"
+                        disabled={socialLoading}
+                        onClick={() => handleSelectReturningSocial(acc, socialMode)}
+                        className="w-full p-3 bg-white hover:bg-sand-100/80 rounded-2xl border border-sand-300 hover:border-gold-500 transition-all flex items-center justify-between text-left shadow-xs group"
+                      >
+                        <div className="flex items-center gap-3">
+                          {acc.avatar ? (
+                            <img src={acc.avatar} alt="" className="w-8 h-8 rounded-full object-cover border border-sand-200" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-forest-900 text-gold text-xs font-semibold flex items-center justify-center">
+                              {acc.name?.charAt(0) || 'U'}
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-xs font-semibold text-forest-950 group-hover:text-gold-700 transition-colors">
+                              {acc.name}
+                            </p>
+                            <p className="text-[11px] text-forest-600 font-sans">
+                              {acc.email}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-forest-400 group-hover:text-gold-600 transition-colors" />
+                      </button>
+                    ))}
+                </div>
+              )}
+
+              {/* Input for user's own email */}
+              <form onSubmit={handleSocialSubmit} className="space-y-3">
                 <span className="text-[10px] uppercase tracking-wider text-forest-600 font-semibold block">
-                  Select Google Account
+                  {socialMode === 'google' ? 'Google Account Email' : 'Apple ID Email'}
                 </span>
-
-                {/* Pre-configured Quick Accounts */}
-                <button
-                  type="button"
-                  disabled={googleLoading}
-                  onClick={() => handleChooseGoogleAccount({
-                    name: 'Brindha Sri',
-                    email: 'brindhas085@gmail.com',
-                    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                    googleId: 'google_brindha_085'
-                  })}
-                  className="w-full p-3.5 bg-white hover:bg-sand-100/80 rounded-2xl border border-sand-300 hover:border-gold-500 transition-all flex items-center justify-between text-left shadow-sm group"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
-                      alt="Avatar"
-                      className="w-9 h-9 rounded-full object-cover border border-sand-200"
-                    />
-                    <div>
-                      <p className="text-xs font-semibold text-forest-950 group-hover:text-gold-700 transition-colors">
-                        Brindha Sri
-                      </p>
-                      <p className="text-[11px] text-forest-600 font-sans">
-                        brindhas085@gmail.com
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-forest-400 group-hover:text-gold-600 transition-colors" />
-                </button>
-
-                <button
-                  type="button"
-                  disabled={googleLoading}
-                  onClick={() => handleChooseGoogleAccount({
-                    name: 'Priya Sharma',
-                    email: 'priya.sharma@gmail.com',
-                    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-                    googleId: 'google_priya_sharma'
-                  })}
-                  className="w-full p-3.5 bg-white hover:bg-sand-100/80 rounded-2xl border border-sand-300 hover:border-gold-500 transition-all flex items-center justify-between text-left shadow-sm group"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80"
-                      alt="Avatar"
-                      className="w-9 h-9 rounded-full object-cover border border-sand-200"
-                    />
-                    <div>
-                      <p className="text-xs font-semibold text-forest-950 group-hover:text-gold-700 transition-colors">
-                        Priya Sharma
-                      </p>
-                      <p className="text-[11px] text-forest-600 font-sans">
-                        priya.sharma@gmail.com
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-forest-400 group-hover:text-gold-600 transition-colors" />
-                </button>
-              </div>
-
-              {/* Or enter any Gmail */}
-              <form onSubmit={handleCustomGoogleSubmit} className="pt-2 border-t border-sand-200 space-y-3">
-                <span className="text-[10px] uppercase tracking-wider text-forest-600 font-semibold block">
-                  Or Sign In with Another Google Email
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Your Name"
-                    value={customGoogleName}
-                    onChange={(e) => setCustomGoogleName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-sand-300 rounded-xl text-xs text-forest-950 focus:outline-none focus:border-gold-500"
-                  />
+                <div>
                   <input
                     type="email"
                     required
-                    placeholder="name@gmail.com"
-                    value={customGoogleEmail}
-                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-sand-300 rounded-xl text-xs text-forest-950 focus:outline-none focus:border-gold-500"
+                    placeholder={socialMode === 'google' ? 'name@gmail.com' : 'name@icloud.com'}
+                    value={socialEmail}
+                    onChange={(e) => setSocialEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-sand-300 rounded-xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
                   />
                 </div>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Full Name (optional)"
+                    value={socialName}
+                    onChange={(e) => setSocialName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-sand-300 rounded-xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
+                  />
+                </div>
+
                 <button
                   type="submit"
-                  disabled={googleLoading}
-                  className="w-full py-2.5 bg-forest-900 hover:bg-forest-800 text-white rounded-xl text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm"
+                  disabled={socialLoading}
+                  className="w-full py-2.5 bg-forest-900 hover:bg-forest-800 text-white rounded-xl text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-60"
                 >
-                  {googleLoading ? (
+                  {socialLoading ? (
                     <div className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <span>Continue with this Google Account</span>
+                    <span>Continue with {socialMode === 'google' ? 'Google' : 'Apple ID'}</span>
                   )}
                 </button>
               </form>
@@ -335,7 +417,7 @@ export default function AuthModal() {
               <div className="pt-2 text-center">
                 <button
                   type="button"
-                  onClick={() => setShowGoogleChooser(false)}
+                  onClick={() => setSocialMode(null)}
                   className="text-xs text-forest-600 hover:text-forest-950 underline underline-offset-2"
                 >
                   ← Back to Email Sign In
@@ -344,94 +426,66 @@ export default function AuthModal() {
             </div>
           ) : (
             <>
-              {/* Tabs */}
-              <div className="flex border-b border-sand-300 mb-6">
-                <button
-                  type="button"
-                  onClick={() => { setAuthModalTab('login'); setErrorMessage(''); }}
-                  className={`flex-1 pb-3 text-xs uppercase tracking-luxury font-semibold transition-all relative ${
-                    authModalTab === 'login'
-                      ? 'text-forest-950 font-bold'
-                      : 'text-forest-700/60 hover:text-forest-950'
-                  }`}
-                >
-                  Sign In
-                  {authModalTab === 'login' && (
-                    <motion.div
-                      layoutId="auth-tab-indicator"
-                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold-600 rounded-full"
-                    />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setAuthModalTab('register'); setErrorMessage(''); }}
-                  className={`flex-1 pb-3 text-xs uppercase tracking-luxury font-semibold transition-all relative ${
-                    authModalTab === 'register'
-                      ? 'text-forest-950 font-bold'
-                      : 'text-forest-700/60 hover:text-forest-950'
-                  }`}
-                >
-                  Create Account
-                  {authModalTab === 'register' && (
-                    <motion.div
-                      layoutId="auth-tab-indicator"
-                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold-600 rounded-full"
-                    />
-                  )}
-                </button>
-              </div>
-
-              {/* Error Message Alert */}
-              {errorMessage && (
-                <div className="mb-5 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
-                  <span>{errorMessage}</span>
+              {/* RETURNING USER CHIP: ONLY shown on this device if logged in 2 or more times */}
+              {eligibleAccounts.length > 0 && authModalTab === 'login' && (
+                <div className="mb-5 p-3 bg-white/80 border border-sand-300 rounded-2xl shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] uppercase tracking-wider text-forest-700 font-bold">
+                      Welcome back
+                    </span>
+                    <span className="text-[10px] text-forest-500">
+                      Recent account
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {eligibleAccounts.map((acc) => (
+                      <div
+                        key={acc.email}
+                        className="flex items-center justify-between p-2 rounded-xl bg-[#FAF7F2] border border-sand-200 hover:border-gold-500 transition-all group"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmail(acc.email);
+                            setPassword('');
+                          }}
+                          className="flex items-center gap-2.5 text-left flex-1"
+                        >
+                          {acc.avatar ? (
+                            <img src={acc.avatar} alt="" className="w-7 h-7 rounded-full object-cover border border-sand-200" />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-forest-900 text-gold text-xs font-semibold flex items-center justify-center">
+                              {acc.name?.charAt(0) || 'G'}
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-xs font-semibold text-forest-950 group-hover:text-gold-700 transition-colors">
+                              {acc.name}
+                            </p>
+                            <p className="text-[11px] text-forest-600 font-sans">
+                              {acc.email}
+                            </p>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveAccount(acc.email);
+                          }}
+                          className="p-1 text-forest-400 hover:text-red-500 transition-colors ml-2"
+                          title="Forget account on this device"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Google Sign In Button */}
-              <div className="mb-5">
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading || googleLoading}
-                  className="w-full py-3 px-4 rounded-2xl bg-white border border-sand-300 hover:border-gold-500 hover:bg-sand-50/80 text-forest-950 text-xs font-semibold tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-3 shadow-sm hover:shadow active:scale-[0.99] disabled:opacity-60"
-                >
-                  {/* Official Google 'G' SVG Logo */}
-                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  <span>{googleLoading ? 'Signing in with Google...' : 'Continue with Google'}</span>
-                </button>
-
-                {/* Elegant Divider */}
-                <div className="relative flex items-center justify-center my-4">
-                  <div className="border-t border-sand-300 w-full" />
-                  <span className="bg-[#FAF7F2] px-3 text-[10px] uppercase tracking-luxury text-forest-700/60 font-semibold whitespace-nowrap">
-                    or continue with email
-                  </span>
-                  <div className="border-t border-sand-300 w-full" />
-                </div>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Main Credentials Form */}
+              <form onSubmit={handleSubmit} className="space-y-3.5">
                 {authModalTab === 'register' && (
                   <>
                     <div>
@@ -445,8 +499,8 @@ export default function AuthModal() {
                           required
                           value={name}
                           onChange={(e) => setName(e.target.value)}
-                          placeholder="e.g. Priya Sharma"
-                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-sm"
+                          placeholder="Your Name"
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
                         />
                       </div>
                     </div>
@@ -463,7 +517,7 @@ export default function AuthModal() {
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
                             placeholder="+91 98765 43210"
-                            className="w-full pl-10 pr-3 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-sm"
+                            className="w-full pl-10 pr-3 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
                           />
                         </div>
                       </div>
@@ -479,7 +533,7 @@ export default function AuthModal() {
                             value={country}
                             onChange={(e) => setCountry(e.target.value)}
                             placeholder="India"
-                            className="w-full pl-10 pr-3 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-sm"
+                            className="w-full pl-10 pr-3 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
                           />
                         </div>
                       </div>
@@ -499,7 +553,7 @@ export default function AuthModal() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@domain.com"
-                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-sm"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
                     />
                   </div>
                 </div>
@@ -517,50 +571,109 @@ export default function AuthModal() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-sm"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
                     />
                   </div>
-                  <p className="mt-1 text-[10px] text-forest-500">Minimum 6 characters.</p>
                 </div>
 
+                {/* Primary Pill Button: Sign in → (Matching Reference Image) */}
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 py-3 bg-forest-900 hover:bg-forest-800 disabled:opacity-60 text-white rounded-full text-xs font-semibold uppercase tracking-luxury transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform active:scale-95"
+                  className="w-full mt-3 py-3 bg-[#111827] hover:bg-forest-950 disabled:opacity-60 text-white rounded-full text-xs font-semibold tracking-wider transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-[0.99]"
                 >
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>{authModalTab === 'login' ? 'Sign In with Email' : 'Confirm Registration'}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-gold" />
+                      <span>{authModalTab === 'login' ? 'Sign in' : 'Create account'}</span>
+                      <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
               </form>
 
-              {/* Footer note */}
-              <div className="mt-6 pt-4 border-t border-sand-300 text-center">
+              {/* Divider: Or continue with (Matching Reference Image) */}
+              <div className="relative flex items-center justify-center my-5">
+                <div className="border-t border-sand-300 w-full" />
+                <span className="bg-[#FAF7F2] px-3 text-xs text-forest-700/60 font-sans whitespace-nowrap">
+                  Or continue with
+                </span>
+                <div className="border-t border-sand-300 w-full" />
+              </div>
+
+              {/* Side-by-side Social Buttons (Matching Reference Image) */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Continue with Google */}
+                <button
+                  type="button"
+                  onClick={handleGoogleClick}
+                  disabled={loading || socialLoading}
+                  className="py-2.5 px-3 rounded-xl border border-sand-300 bg-white hover:bg-sand-50/80 text-forest-950 text-xs font-medium flex items-center justify-center gap-2 transition-all shadow-xs hover:border-gold-500 active:scale-[0.99] disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span className="truncate">Continue with Google</span>
+                </button>
+
+                {/* Apple ID */}
+                <button
+                  type="button"
+                  onClick={handleAppleClick}
+                  disabled={loading || socialLoading}
+                  className="py-2.5 px-3 rounded-xl border border-sand-300 bg-white hover:bg-sand-50/80 text-forest-950 text-xs font-medium flex items-center justify-center gap-2 transition-all shadow-xs hover:border-gold-500 active:scale-[0.99] disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 fill-current text-forest-950 flex-shrink-0" viewBox="0 0 170 170">
+                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.04-7.59-7.71-11.72-14-4.58-7.07-8.24-15.04-10.99-23.91-2.76-8.88-4.14-17.38-4.14-25.5 0-13.44 3.37-24.8 10.12-34.08 6.74-9.28 15.2-13.97 25.38-14.07 5.43 0 11.25 1.52 17.47 4.57 6.22 3.05 10.16 4.62 11.83 4.7 1.45 0 5.61-1.63 12.5-4.9 6.89-3.27 12.82-4.7 17.8-4.3 13.25 1.04 23.36 5.86 30.33 14.46-11.75 7.07-17.51 16.89-17.27 29.46.24 9.77 3.97 17.97 11.19 24.6 7.22 6.63 15.77 10.37 25.66 11.22-2.17 6.74-4.78 13.3-7.83 19.68zM119.22 31.84c0-7.39 2.65-14.15 7.95-20.28 5.3-6.13 11.78-9.85 19.44-11.16.22 1.3.33 2.45.33 3.44 0 7.39-2.72 14.31-8.16 20.76-5.44 6.45-12.01 10.09-19.7 10.92-.11-1.19-.17-2.42-.17-3.68z"/>
+                  </svg>
+                  <span className="truncate">Apple ID</span>
+                </button>
+              </div>
+
+              {/* Footer (Matching Reference Image) */}
+              <div className="mt-6 text-center text-xs text-forest-700/80">
                 {authModalTab === 'login' ? (
-                  <p className="text-xs text-forest-700">
-                    New guest to Veloura?{' '}
+                  <p>
+                    Don't have an account?{' '}
                     <button
                       type="button"
-                      onClick={() => { setAuthModalTab('register'); setErrorMessage(''); }}
-                      className="text-gold-700 hover:text-gold-800 font-semibold underline underline-offset-2 ml-1"
+                      onClick={() => {
+                        setAuthModalTab('register');
+                        setErrorMessage('');
+                      }}
+                      className="font-bold text-forest-950 hover:underline ml-1"
                     >
-                      Create an account
+                      Sign up
                     </button>
                   </p>
                 ) : (
-                  <p className="text-xs text-forest-700">
-                    Already registered?{' '}
+                  <p>
+                    Already have an account?{' '}
                     <button
                       type="button"
-                      onClick={() => { setAuthModalTab('login'); setErrorMessage(''); }}
-                      className="text-gold-700 hover:text-gold-800 font-semibold underline underline-offset-2 ml-1"
+                      onClick={() => {
+                        setAuthModalTab('login');
+                        setErrorMessage('');
+                      }}
+                      className="font-bold text-forest-950 hover:underline ml-1"
                     >
-                      Sign in here
+                      Sign in
                     </button>
                   </p>
                 )}

@@ -210,6 +210,83 @@ export const googleLogin = async (req, res, next) => {
   }
 };
 
+// @desc    Authenticate or register user via Apple ID
+// @route   POST /api/auth/apple
+// @access  Public
+export const appleLogin = async (req, res, next) => {
+  try {
+    const { identityToken, profile } = req.body;
+
+    let email = null;
+    let name = null;
+    let appleId = null;
+
+    if (identityToken) {
+      try {
+        const payloadBase64 = identityToken.split('.')[1];
+        const decodedJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
+        const payload = JSON.parse(decodedJson);
+        email = payload.email;
+        appleId = payload.sub;
+      } catch (err) {
+        console.warn('Could not parse Apple identity token:', err.message);
+      }
+    }
+
+    if (!email && profile) {
+      email = profile.email;
+      name = profile.name;
+      appleId = profile.appleId || profile.sub || profile.id;
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Apple authentication failed: Email address could not be verified.'
+      });
+    }
+
+    const emailNormalized = email.toLowerCase().trim();
+    let user = await User.findOne({ email: emailNormalized });
+
+    if (user) {
+      if (!user.appleId && appleId) {
+        user.appleId = appleId;
+        user.authProvider = 'apple';
+        await user.save();
+      }
+    } else {
+      user = await User.create({
+        name: name || emailNormalized.split('@')[0],
+        email: emailNormalized,
+        appleId: appleId || `apple_${Date.now()}`,
+        authProvider: 'apple',
+        country: 'India'
+      });
+    }
+
+    const token = generateToken(user._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Signed in with Apple ID successfully.',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        country: user.country,
+        avatar: user.avatar,
+        authProvider: user.authProvider,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get current authenticated user profile
 // @route   GET /api/auth/me
 // @access  Private
