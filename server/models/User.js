@@ -19,9 +19,25 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Please provide a password'],
+    required: function() {
+      return !this.googleId && this.authProvider !== 'google';
+    },
     minlength: [6, 'Password must be at least 6 characters'],
     select: false // Do not return password by default in queries
+  },
+  googleId: {
+    type: String,
+    default: null,
+    sparse: true
+  },
+  avatar: {
+    type: String,
+    default: ''
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   },
   phone: {
     type: String,
@@ -57,9 +73,9 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving
+// Hash password before saving (only if password exists and was modified)
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
+  if (!this.password || !this.isModified('password')) {
     return next();
   }
   const salt = await bcrypt.genSalt(10);
@@ -69,10 +85,10 @@ userSchema.pre('save', async function (next) {
 
 // Method to verify password on login
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
 const User = mongoose.model('User', userSchema);
 
 export default User;
-

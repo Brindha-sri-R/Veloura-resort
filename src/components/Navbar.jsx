@@ -140,8 +140,12 @@ export default function Navbar() {
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                     className="inline-flex items-center gap-2 text-[11px] xl:text-xs tracking-wider uppercase text-forest-900 px-3 py-1.5 rounded-full border border-sand-300 hover:border-gold/60 bg-white/90 transition-all shadow-sm"
                   >
-                    <span className="w-6 h-6 rounded-full bg-forest-900 text-gold text-[10px] font-serif font-bold flex items-center justify-center">
-                      {user.name ? user.name.charAt(0).toUpperCase() : 'G'}
+                    <span className="w-6 h-6 rounded-full bg-forest-900 text-gold text-[10px] font-serif font-bold flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {user.avatar ? (
+                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        user.name ? user.name.charAt(0).toUpperCase() : 'G'
+                      )}
                     </span>
                     <span className="max-w-[100px] truncate font-medium">{user.name.split(' ')[0]}</span>
                     <ChevronDown className={`w-3 h-3 text-gold transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
@@ -296,8 +300,12 @@ export default function Navbar() {
               {user ? (
                 <div className="p-3 mb-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-8 h-8 rounded-full bg-gold text-forest-950 font-serif font-bold text-xs flex items-center justify-center flex-shrink-0">
-                      {user.name ? user.name.charAt(0).toUpperCase() : 'G'}
+                    <span className="w-8 h-8 rounded-full bg-gold text-forest-950 font-serif font-bold text-xs flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {user.avatar ? (
+                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        user.name ? user.name.charAt(0).toUpperCase() : 'G'
+                      )}
                     </span>
                     <div className="min-w-0">
                       <p className="text-xs font-serif text-white truncate">{user.name}</p>

@@ -54,6 +54,25 @@ async function runTests() {
     const meData = await meRes.json();
     console.log('✅ Auth Me Profile:', meData.success ? `Authenticated as ${meData.user.name} (${meData.user.country})` : meData.message);
 
+    // 5b. Google Sign-In Test
+    const googleRes = await fetch(`${baseUrl}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profile: {
+          name: 'Priya Sharma (Google)',
+          email: `google_${Date.now()}@gmail.com`,
+          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+          googleId: `google_oauth_${Date.now()}`
+        }
+      })
+    });
+    const googleData = await googleRes.json();
+    console.log('✅ Google Auth:', googleData.success ? `Authenticated via Google as ${googleData.user.name} (${googleData.user.authProvider})` : googleData.message);
+    if (!googleData.success || !googleData.token) {
+      throw new Error(`Google authentication failed: ${googleData.message}`);
+    }
+
     // 6. Create Booking with Indian Guest & Address Details
     const bookingRes = await fetch(`${baseUrl}/bookings`, {
       method: 'POST',

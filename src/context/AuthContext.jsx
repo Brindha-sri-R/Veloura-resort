@@ -83,6 +83,19 @@ export function AuthProvider({ children }) {
     throw new Error(response.message || 'Registration failed');
   };
 
+  const googleLogin = async (googleData) => {
+    const response = await api.googleLogin(googleData);
+    if (response.success && response.token) {
+      setAuthToken(response.token);
+      setToken(response.token);
+      setUser(response.user);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
+      closeAuthModal();
+      return response;
+    }
+    throw new Error(response.message || 'Google authentication failed');
+  };
+
   const logout = () => {
     setAuthToken(null);
     setToken(null);
@@ -108,6 +121,7 @@ export function AuthProvider({ children }) {
         closeAuthModal,
         login,
         register,
+        googleLogin,
         logout
       }}
     >

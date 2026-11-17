@@ -78,6 +78,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload)
   }),
+  googleLogin: (payload) => apiRequest('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
   getMe: () => apiRequest('/auth/me'),
   updateMe: (payload) => apiRequest('/auth/me', {
     method: 'PUT',

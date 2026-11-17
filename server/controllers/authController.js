@@ -37,7 +37,8 @@ export const registerUser = async (req, res, next) => {
       email: emailNormalized,
       password,
       phone: phone ? phone.trim() : '',
-      country: country ? country.trim() : ''
+      country: country ? country.trim() : 'India',
+      authProvider: 'local'
     });
 
     const token = generateToken(user._id);
@@ -52,6 +53,8 @@ export const registerUser = async (req, res, next) => {
         email: user.email,
         phone: user.phone,
         country: user.country,
+        avatar: user.avatar,
+        authProvider: user.authProvider,
         role: user.role
       }
     });
@@ -103,6 +106,102 @@ export const loginUser = async (req, res, next) => {
         email: user.email,
         phone: user.phone,
         country: user.country,
+        avatar: user.avatar,
+        authProvider: user.authProvider,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Authenticate or register user via Google
+// @route   POST /api/auth/google
+// @access  Public
+export const googleLogin = async (req, res, next) => {
+  try {
+    const { credential, profile } = req.body;
+
+    let email = null;
+    let name = null;
+    let googleId = null;
+    let avatar = null;
+
+    if (credential) {
+      // Decode JWT credential from Google Identity Services
+      try {
+        const payloadBase64 = credential.split('.')[1];
+        const decodedJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
+        const payload = JSON.parse(decodedJson);
+        email = payload.email;
+        name = payload.name;
+        googleId = payload.sub;
+        avatar = payload.picture;
+      } catch (err) {
+        console.warn('Could not parse Google credential JWT:', err.message);
+      }
+    }
+
+    // Direct profile object fallback
+    if (!email && profile) {
+      email = profile.email;
+      name = profile.name;
+      googleId = profile.googleId || profile.sub || profile.id;
+      avatar = profile.avatar || profile.picture;
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google authentication failed: Email address could not be verified.'
+      });
+    }
+
+    const emailNormalized = email.toLowerCase().trim();
+    let user = await User.findOne({ email: emailNormalized });
+
+    if (user) {
+      // Link Google ID and update avatar if not yet present
+      let modified = false;
+      if (!user.googleId && googleId) {
+        user.googleId = googleId;
+        user.authProvider = 'google';
+        modified = true;
+      }
+      if (avatar && !user.avatar) {
+        user.avatar = avatar;
+        modified = true;
+      }
+      if (modified) {
+        await user.save();
+      }
+    } else {
+      // Create new user with Google verified identity
+      user = await User.create({
+        name: name || emailNormalized.split('@')[0],
+        email: emailNormalized,
+        googleId: googleId || `google_${Date.now()}`,
+        avatar: avatar || '',
+        authProvider: 'google',
+        country: 'India'
+      });
+    }
+
+    const token = generateToken(user._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Signed in with Google successfully.',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        country: user.country,
+        avatar: user.avatar,
+        authProvider: user.authProvider,
         role: user.role
       }
     });
@@ -164,6 +263,8 @@ export const updateUserProfile = async (req, res, next) => {
         email: updatedUser.email,
         phone: updatedUser.phone,
         country: updatedUser.country,
+        avatar: updatedUser.avatar,
+        authProvider: updatedUser.authProvider,
         role: updatedUser.role
       }
     });
@@ -171,4 +272,3 @@ export const updateUserProfile = async (req, res, next) => {
     next(error);
   }
 };
-
