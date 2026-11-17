@@ -32,7 +32,6 @@ export const recordUserLogin = (user) => {
       ...prev,
       name: user.name || prev.name,
       avatar: user.avatar || prev.avatar,
-      authProvider: user.authProvider || prev.authProvider || 'local',
       loginCount: (prev.loginCount || 0) + 1,
       lastLogin: Date.now()
     };
@@ -69,34 +68,53 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState('login'); // 'login' | 'register'
+  const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
 
-  // Verify token on mount and refresh profile
+  // Verify token on mount and refresh profile (resilient to back button and network blips)
   useEffect(() => {
+    let isMounted = true;
+
     const verifyToken = async () => {
       const currentToken = getAuthToken();
       if (!currentToken) {
-        setUser(null);
-        setLoading(false);
+        if (isMounted) {
+          setUser(null);
+          setLoading(false);
+        }
         return;
       }
 
       try {
         const data = await api.getMe();
-        if (data.success && data.user) {
-          setUser(data.user);
-          localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
-        } else {
-          logout();
+        if (isMounted) {
+          if (data.success && data.user) {
+            setUser(data.user);
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+          } else {
+            logout();
+          }
         }
       } catch (err) {
-        console.warn('Session verification failed, resetting token:', err.message);
-        logout();
+        // ONLY clear session if server explicitly tells us the token is invalid or expired (401/403)
+        // Never log out on network disconnects, server warm-up, or back-button transitions
+        if (err.status === 401 || err.status === 403) {
+          console.warn('Authentication token expired or unauthorized. Clearing session.');
+          if (isMounted) logout();
+        } else {
+          console.warn('Session verification could not reach server; retaining stored session:', err.message);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     verifyToken();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const openAuthModal = (tab = 'login') => {
@@ -106,6 +124,22 @@ export function AuthProvider({ children }) {
 
   const closeAuthModal = () => {
     setIsAuthModalOpen(false);
+  };
+
+  const openSignOutModal = () => {
+    setIsSignOutModalOpen(true);
+  };
+
+  const closeSignOutModal = () => {
+    setIsSignOutModalOpen(false);
+  };
+
+  const confirmSignOut = (onSignedOut) => {
+    logout();
+    setIsSignOutModalOpen(false);
+    if (typeof onSignedOut === 'function') {
+      onSignedOut();
+    }
   };
 
   const login = async (email, password) => {
@@ -187,6 +221,10 @@ export function AuthProvider({ children }) {
         setAuthModalTab,
         openAuthModal,
         closeAuthModal,
+        isSignOutModalOpen,
+        openSignOutModal,
+        closeSignOutModal,
+        confirmSignOut,
         login,
         register,
         googleLogin,

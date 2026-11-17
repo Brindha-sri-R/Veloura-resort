@@ -11,7 +11,7 @@ export default function Navbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userMenuRef = useRef(null);
   const { bookings, showToast } = useBooking();
-  const { user, logout, openAuthModal } = useAuth();
+  const { user, logout, openAuthModal, openSignOutModal } = useAuth();
   const location = useLocation();
 
   // Booking count (strictly derived from state/localStorage, never hardcoded)
@@ -179,8 +179,7 @@ export default function Navbar() {
                           type="button"
                           onClick={() => {
                             setUserDropdownOpen(false);
-                            logout();
-                            showToast('Signed out of Veloura Sanctuary', 'info');
+                            openSignOutModal();
                           }}
                           className="w-full flex items-center gap-2 px-4 py-2.5 text-rose-700 hover:bg-rose-50 transition-colors text-left"
                         >
@@ -315,9 +314,8 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => {
-                      logout();
                       setMobileMenuOpen(false);
-                      showToast('Signed out of Veloura Sanctuary', 'info');
+                      openSignOutModal();
                     }}
                     className="p-1.5 text-rose-300 hover:text-rose-100 transition-colors ml-2 flex-shrink-0"
                     title="Sign Out"

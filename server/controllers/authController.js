@@ -121,7 +121,7 @@ export const loginUser = async (req, res, next) => {
 // @access  Public
 export const googleLogin = async (req, res, next) => {
   try {
-    const { credential, profile } = req.body;
+    const { credential, profile, accessToken } = req.body;
 
     let email = null;
     let name = null;
@@ -143,18 +143,36 @@ export const googleLogin = async (req, res, next) => {
       }
     }
 
-    // Direct profile object fallback
-    if (!email && profile) {
+    // Verify access token using Google userinfo endpoint if provided
+    if (!email && accessToken) {
+      try {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (userInfoRes.ok) {
+          const payload = await userInfoRes.json();
+          email = payload.email;
+          name = payload.name;
+          googleId = payload.sub;
+          avatar = payload.picture;
+        }
+      } catch (err) {
+        console.warn('Could not verify Google accessToken:', err.message);
+      }
+    }
+
+    // Direct verified profile fallback
+    if (!email && profile && (profile.googleId || profile.sub)) {
       email = profile.email;
       name = profile.name;
-      googleId = profile.googleId || profile.sub || profile.id;
+      googleId = profile.googleId || profile.sub;
       avatar = profile.avatar || profile.picture;
     }
 
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Google authentication failed: Email address could not be verified.'
+        message: 'Google authentication failed: Email address could not be verified by Google.'
       });
     }
 

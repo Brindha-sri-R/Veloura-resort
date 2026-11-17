@@ -10,6 +10,8 @@ import Toast from './components/Toast';
 import ScrollProgress from './components/ScrollProgress';
 import CustomCursor from './components/CustomCursor';
 import AuthModal from './components/AuthModal';
+import SignOutConfirmationModal from './components/SignOutConfirmationModal';
+import ProtectedRoute from './components/ProtectedRoute';
 
 import Home from './pages/Home';
 import Stays from './pages/Stays';
@@ -20,6 +22,7 @@ import Contact from './pages/Contact';
 import BookingFlow from './pages/BookingFlow';
 import BookingConfirmation from './pages/BookingConfirmation';
 import MyBookings from './pages/MyBookings';
+import SignIn from './pages/SignIn';
 import NotFound from './pages/NotFound';
 
 function AnimatedRoutes() {
@@ -44,7 +47,16 @@ function AnimatedRoutes() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/book" element={<BookingFlow />} />
           <Route path="/confirmation/:reference" element={<BookingConfirmation />} />
-          <Route path="/my-bookings" element={<MyBookings />} />
+          <Route
+            path="/my-bookings"
+            element={
+              <ProtectedRoute>
+                <MyBookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/signin" element={<SignIn />} />
+          <Route path="/login" element={<SignIn />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </motion.div>
@@ -68,6 +80,7 @@ export default function App() {
             <Footer />
             <Toast />
             <AuthModal />
+            <SignOutConfirmationModal />
           </div>
         </Router>
       </BookingProvider>
