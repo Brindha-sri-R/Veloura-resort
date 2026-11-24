@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Users, Trash2, ExternalLink, ArrowRight, Sparkles, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Calendar, Trash2, ExternalLink, ArrowRight, Sparkles } from 'lucide-react';
 import { useBooking } from '../context/BookingContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import { BookingCardSkeleton } from '../components/SkeletonLoader';
 
 export default function MyBookings() {
-  const { bookings, cancelBooking, refreshBookings } = useBooking();
+  const { bookings, cancelBooking, refreshBookings, loadingBookings } = useBooking();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -21,20 +22,26 @@ export default function MyBookings() {
     <div className="pt-28 pb-24 bg-[#FAF7F2] min-h-screen">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 text-xs uppercase tracking-luxury text-gold-600 font-semibold mb-3">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-luxury text-gold-600 font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Guest Itineraries</span>
           </div>
-          <h1 className="font-serif text-4xl sm:text-5xl text-forest-950 font-normal tracking-tight">
+          <h1 className="font-serif text-3xl sm:text-5xl text-forest-950 font-normal tracking-tight">
             My Reservations
           </h1>
-          <p className="mt-3 text-sm text-forest-700/80 font-sans max-w-lg mx-auto">
-            Review and manage your active and past reservations saved locally in this browser.
+          <p className="mt-2.5 text-xs sm:text-sm text-forest-700/80 font-sans max-w-md mx-auto">
+            Review and manage your active and past reservations.
           </p>
         </div>
 
-        {bookings.length > 0 ? (
+        {loadingBookings ? (
+          <div className="space-y-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <BookingCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : bookings.length > 0 ? (
           <div className="space-y-6">
             {bookings.map((booking) => {
               const stayImage = booking.staySnapshot?.image || booking.stay?.images?.[0] || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=600&q=80';
@@ -130,23 +137,23 @@ export default function MyBookings() {
             })}
           </div>
         ) : (
-          <div className="bg-white rounded-3xl p-12 text-center border border-sand-300 shadow-luxury max-w-lg mx-auto space-y-4">
-            <div className="w-16 h-16 rounded-full bg-sand-100 text-forest-700 mx-auto flex items-center justify-center">
-              <Calendar className="w-8 h-8" />
+          <div className="bg-white rounded-3xl p-10 text-center border border-sand-300 shadow-luxury max-w-lg mx-auto space-y-4">
+            <div className="w-14 h-14 rounded-full bg-sand-100 text-forest-700 mx-auto flex items-center justify-center">
+              <Calendar className="w-7 h-7" />
             </div>
             <h3 className="font-serif text-2xl text-forest-950 font-normal">
               No Active Reservations
             </h3>
-            <p className="text-sm text-forest-600 leading-relaxed font-sans">
-              You haven't reserved any sanctuaries yet. Explore our curated villas and retreat into luxury.
+            <p className="text-xs text-forest-600 leading-relaxed font-sans">
+              You haven't reserved any sanctuaries yet. Explore our curated private villas and retreat into luxury.
             </p>
             <div className="pt-2">
               <Link
                 to="/stays"
-                className="inline-flex items-center gap-2 px-8 py-3.5 bg-forest-900 hover:bg-forest-800 text-white rounded-full text-xs font-semibold tracking-luxury uppercase transition-all shadow-md"
+                className="inline-flex items-center gap-2 px-7 py-3 bg-forest-900 hover:bg-forest-800 text-white rounded-full text-xs font-semibold tracking-luxury uppercase transition-all shadow-md"
               >
-                <span>Browse Sanctuaries</span>
-                <ArrowRight className="w-4 h-4 text-gold" />
+                <span>Explore Villas</span>
+                <ArrowRight className="w-3.5 h-3.5 text-gold" />
               </Link>
             </div>
           </div>

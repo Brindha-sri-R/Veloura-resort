@@ -128,8 +128,8 @@ export default function StayCard({ stay, featured = false, index = null }) {
               </span>
               <span className="text-xs text-forest-600 font-sans">/ night</span>
             </div>
-            <span className="text-[10px] text-forest-500 uppercase tracking-widest block font-sans">
-              *Demo simulated rate
+            <span className="text-[10px] text-gold-700 uppercase tracking-widest block font-sans">
+              Includes breakfast & butler
             </span>
           </div>
 
@@ -145,7 +145,7 @@ export default function StayCard({ stay, featured = false, index = null }) {
               onClick={handleBookNow}
               className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-full bg-forest-900 hover:bg-forest-800 text-white text-xs font-semibold tracking-luxury uppercase transition-all duration-300 shadow-md hover:shadow-xl active:scale-95 group/btn"
             >
-              <span>Reserve</span>
+              <span>Book Your Stay</span>
               <ArrowRight className="w-3 h-3 text-gold group-hover/btn:translate-x-1 transition-transform" />
             </button>
           </div>

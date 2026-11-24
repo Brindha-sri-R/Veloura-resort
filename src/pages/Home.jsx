@@ -13,14 +13,19 @@ import MagneticButton from '../components/MagneticButton';
 import { staysData, roomCategories } from '../data/staysData';
 import { experiencesData } from '../data/experiencesData';
 import { luxuryEase } from '../utils/motion';
+import { useBooking } from '../context/BookingContext';
+import { StayCardSkeleton } from '../components/SkeletonLoader';
 
 export default function Home() {
+  const { stays, loadingStays } = useBooking();
   const [activeCategory, setActiveCategory] = useState('All Stays');
   const [selectedExperience, setSelectedExperience] = useState(null);
 
+  const availableStays = stays && stays.length > 0 ? stays : staysData;
+
   const filteredStays = activeCategory === 'All Stays'
-    ? staysData.slice(0, 4) // Show the four core categories
-    : staysData.filter(s => s.category === activeCategory);
+    ? availableStays.slice(0, 4) // Show the four core categories
+    : availableStays.filter(s => s.category === activeCategory);
 
   const flagshipExperience = experiencesData[0]; // Coral Reef Spa
   const remainingExperiences = experiencesData.slice(1, 4);
@@ -75,15 +80,21 @@ export default function Home() {
           </div>
         </motion.div>
 
-        {/* Stays Grid with Staggered Numbering (References 1 & 3) */}
+        {/* Stays Grid with Staggered Numbering */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
-          {filteredStays.map((stay, idx) => (
-            <StayCard
-              key={stay.id}
-              stay={stay}
-              index={`0${idx + 1} / 0${filteredStays.length}`}
-            />
-          ))}
+          {loadingStays ? (
+            Array.from({ length: 4 }).map((_, idx) => (
+              <StayCardSkeleton key={idx} />
+            ))
+          ) : (
+            filteredStays.map((stay, idx) => (
+              <StayCard
+                key={stay.id}
+                stay={stay}
+                index={`0${idx + 1} / 0${filteredStays.length}`}
+              />
+            ))
+          )}
         </div>
 
         {/* View All Stays Link */}
@@ -99,7 +110,7 @@ export default function Home() {
               to="/stays"
               className="inline-flex items-center gap-2.5 px-8 py-4 rounded-full border border-forest-900 text-forest-950 hover:bg-forest-900 hover:text-white text-xs font-semibold tracking-luxury uppercase transition-all duration-300 shadow-sm group"
             >
-              <span>Explore All Sanctuaries</span>
+              <span>Explore Villas</span>
               <ArrowRight className="w-4 h-4 text-gold group-hover:translate-x-1.5 transition-transform duration-300" />
             </Link>
           </MagneticButton>

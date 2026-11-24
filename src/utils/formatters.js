@@ -72,6 +72,39 @@ export function getTodayDateString(offsetDays = 0) {
 }
 
 /**
+ * Validates standard email address format
+ */
+export function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim();
+  // Standard RFC 5322 compliant email regex
+  const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+  return regex.test(trimmed);
+}
+
+/**
+ * Validates password strength:
+ * - At least 8 characters
+ * - At least one letter (a-z or A-Z)
+ * - At least one number or special character
+ */
+export function validatePassword(password) {
+  if (!password || typeof password !== 'string') {
+    return { isValid: false, message: 'Password is required.' };
+  }
+  if (password.length < 8) {
+    return { isValid: false, message: 'Password must be at least 8 characters long.' };
+  }
+  if (!/[a-zA-Z]/.test(password)) {
+    return { isValid: false, message: 'Password must include at least one letter.' };
+  }
+  if (!/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    return { isValid: false, message: 'Password must include at least one number or symbol.' };
+  }
+  return { isValid: true, message: '' };
+}
+
+/**
  * Validates 10-digit Indian mobile numbers (+91, 91, 0, or direct 10-digit starting with 6-9)
  */
 export function isValidIndianPhone(phone) {

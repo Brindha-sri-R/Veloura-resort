@@ -8,14 +8,15 @@ import {
 import { staysData } from '../data/staysData';
 import { useBooking } from '../context/BookingContext';
 import { formatCurrency, calculateNights, getTodayDateString } from '../utils/formatters';
+import { StayDetailsSkeleton } from '../components/SkeletonLoader';
 
 export default function StayDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { setSelectedStay, searchParams, updateSearchParams, showToast, stays } = useBooking();
+  const { setSelectedStay, searchParams, updateSearchParams, showToast, stays, loadingStays } = useBooking();
 
   const stayList = stays && stays.length > 0 ? stays : staysData;
-  const stay = stayList.find((s) => s.id === id || s.slug === id) || stayList[0];
+  const stay = stayList.find((s) => s.id === id || s.slug === id);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -26,6 +27,36 @@ export default function StayDetails() {
   const [adults, setAdults] = useState(searchParams.adults || 2);
   const [children, setChildren] = useState(searchParams.children || 0);
   const [validationError, setValidationError] = useState('');
+
+  if (loadingStays) {
+    return (
+      <div className="pt-24 pb-24 bg-[#FAF7F2] min-h-screen">
+        <StayDetailsSkeleton />
+      </div>
+    );
+  }
+
+  if (!stay) {
+    return (
+      <div className="pt-28 pb-24 bg-[#FAF7F2] min-h-screen flex items-center justify-center px-4">
+        <div className="bg-white rounded-3xl p-10 text-center border border-sand-300 shadow-luxury max-w-md space-y-4">
+          <h2 className="font-serif text-3xl text-forest-950 font-normal">Sanctuary Not Found</h2>
+          <p className="text-xs text-forest-600 font-sans leading-relaxed">
+            The villa you are looking for is currently unavailable or has been archived.
+          </p>
+          <div className="pt-2">
+            <Link
+              to="/stays"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-forest-900 text-white rounded-full text-xs font-semibold tracking-luxury uppercase hover:bg-forest-800 transition-colors shadow-sm"
+            >
+              <span>Explore Villas</span>
+              <ArrowRight className="w-3.5 h-3.5 text-gold" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const rawNights = calculateNights(checkIn, checkOut);
   const nights = Math.max(1, rawNights);

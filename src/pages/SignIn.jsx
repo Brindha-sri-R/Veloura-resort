@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, Mail, User, Phone, Globe, Sparkles, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, User, Phone, Globe, Sparkles, ArrowRight, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useAuth, getLoginHistory, removeSavedAccount } from '../context/AuthContext';
 import { useBooking } from '../context/BookingContext';
 import { isValidIndianPhone } from '../utils/formatters';
@@ -18,9 +18,17 @@ export default function SignIn() {
   // Form fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('India');
+
+  // Password visibility toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Field errors
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Status
   const [loading, setLoading] = useState(false);
@@ -71,13 +79,75 @@ export default function SignIn() {
     if (email.toLowerCase().trim() === targetEmail.toLowerCase().trim()) {
       setEmail('');
       setPassword('');
+      setConfirmPassword('');
     }
+  };
+
+  const clearError = (field) => {
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+    if (errorMessage) setErrorMessage('');
+  };
+
+  // Client validation
+  const validateForm = () => {
+    const errors = {};
+    const trimmedEmail = email.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!trimmedEmail) {
+      errors.email = 'Email address is required.';
+    } else if (!emailRegex.test(trimmedEmail)) {
+      errors.email = 'Please provide a valid email format (e.g. name@domain.com).';
+    }
+
+    if (tab === 'login') {
+      if (!password) {
+        errors.password = 'Password is required.';
+      }
+    } else {
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        errors.name = 'Full name is required.';
+      } else if (trimmedName.length < 2) {
+        errors.name = 'Name must be at least 2 characters.';
+      }
+
+      if (phone && phone.trim() !== '' && phone.trim() !== '+91') {
+        if (!isValidIndianPhone(phone)) {
+          errors.phone = 'Valid 10-digit Indian mobile number required (+91 98765 43210).';
+        }
+      }
+
+      if (!password) {
+        errors.password = 'Password is required.';
+      } else if (password.length < 8) {
+        errors.password = 'Password must be at least 8 characters long.';
+      } else if (!/[a-zA-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
+        errors.password = 'Password must include at least one letter and one number or symbol.';
+      }
+
+      if (!confirmPassword) {
+        errors.confirmPassword = 'Please confirm your password.';
+      } else if (confirmPassword !== password) {
+        errors.confirmPassword = 'Passwords do not match.';
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Real Google Sign-In flow
   const handleGoogleSignIn = async () => {
     setErrorMessage('');
     setInfoMessage('');
+    setFieldErrors({});
 
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -98,7 +168,6 @@ export default function SignIn() {
     setSocialLoading(true);
 
     try {
-      // Initiate actual Google OAuth 2.0 Token Client with account selector
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: googleClientId,
         scope: 'email profile openid',
@@ -120,7 +189,6 @@ export default function SignIn() {
           }
 
           try {
-            // Retrieve verified user profile from Google userinfo API
             const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
               headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
             });
@@ -131,7 +199,6 @@ export default function SignIn() {
 
             const profile = await userInfoRes.json();
 
-            // Submit verified Google identity to Veloura backend
             const res = await googleLogin({
               profile: {
                 name: profile.name,
@@ -160,7 +227,6 @@ export default function SignIn() {
         }
       });
 
-      // Display Google's official account selection screen
       tokenClient.requestAccessToken({ prompt: 'select_account' });
     } catch (err) {
       setSocialLoading(false);
@@ -172,7 +238,6 @@ export default function SignIn() {
   const handleAppleSignIn = () => {
     setErrorMessage('');
     setInfoMessage('');
-    // Clear message if Apple ID OAuth is not configured
     setErrorMessage('Apple ID authentication is not configured for this domain.');
   };
 
@@ -181,35 +246,29 @@ export default function SignIn() {
     e.preventDefault();
     setErrorMessage('');
     setInfoMessage('');
+
+    if (loading || socialLoading) return;
+
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (tab === 'login') {
-        if (!email.trim() || !password) {
-          setErrorMessage('Please provide both your email and password.');
-          setLoading(false);
-          return;
-        }
-        const res = await login(email, password);
+        const res = await login(email.trim().toLowerCase(), password);
         showToast(`Welcome back, ${res.user.name}. Your sanctuary awaits.`);
         navigate(destination, { replace: true });
       } else {
-        if (!name.trim() || !email.trim() || !password) {
-          setErrorMessage('Please complete all required fields.');
-          setLoading(false);
-          return;
-        }
-        if (password.length < 6) {
-          setErrorMessage('Password must be at least 6 characters.');
-          setLoading(false);
-          return;
-        }
-        if (phone && !isValidIndianPhone(phone)) {
-          setErrorMessage('Please provide a valid 10-digit Indian mobile number (+91 98765 43210).');
-          setLoading(false);
-          return;
-        }
-        const res = await register({ name, email, password, phone, country });
+        const res = await register({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          confirmPassword,
+          phone: phone.trim(),
+          country: country.trim() || 'India'
+        });
         showToast(`Welcome to Veloura, ${res.user.name}. Your account is active.`);
         navigate(destination, { replace: true });
       }
@@ -282,6 +341,8 @@ export default function SignIn() {
                     onClick={() => {
                       setEmail(acc.email);
                       setPassword('');
+                      setConfirmPassword('');
+                      setFieldErrors({});
                     }}
                     className="flex items-center gap-2.5 text-left flex-1"
                   >
@@ -319,7 +380,7 @@ export default function SignIn() {
         )}
 
         {/* Credentials Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
           {tab === 'register' && (
             <>
               <div>
@@ -332,11 +393,22 @@ export default function SignIn() {
                     type="text"
                     required
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      clearError('name');
+                    }}
                     placeholder="Your Name"
-                    className="w-full pl-10 pr-4 py-2.5 bg-[#FAF7F2] border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
+                    className={`w-full pl-10 pr-4 py-2.5 bg-[#FAF7F2] border rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none transition-colors shadow-xs ${
+                      fieldErrors.name ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20' : 'border-sand-300 focus:border-gold-500'
+                    }`}
                   />
                 </div>
+                {fieldErrors.name && (
+                  <p className="mt-1 text-[11px] text-rose-600 font-sans flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span>{fieldErrors.name}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -349,11 +421,22 @@ export default function SignIn() {
                     <input
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        clearError('phone');
+                      }}
                       placeholder="+91 98765 43210"
-                      className="w-full pl-10 pr-3 py-2.5 bg-[#FAF7F2] border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
+                      className={`w-full pl-10 pr-3 py-2.5 bg-[#FAF7F2] border rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none transition-colors shadow-xs ${
+                        fieldErrors.phone ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20' : 'border-sand-300 focus:border-gold-500'
+                      }`}
                     />
                   </div>
+                  {fieldErrors.phone && (
+                    <p className="mt-1 text-[11px] text-rose-600 font-sans flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      <span>{fieldErrors.phone}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -385,11 +468,22 @@ export default function SignIn() {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearError('email');
+                }}
                 placeholder="name@domain.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-[#FAF7F2] border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
+                className={`w-full pl-10 pr-4 py-2.5 bg-[#FAF7F2] border rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none transition-colors shadow-xs ${
+                  fieldErrors.email ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20' : 'border-sand-300 focus:border-gold-500'
+                }`}
               />
             </div>
+            {fieldErrors.email && (
+              <p className="mt-1 text-[11px] text-rose-600 font-sans flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                <span>{fieldErrors.email}</span>
+              </p>
+            )}
           </div>
 
           <div>
@@ -399,21 +493,80 @@ export default function SignIn() {
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-forest-500" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
-                minLength={6}
+                minLength={tab === 'register' ? 8 : 6}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 bg-[#FAF7F2] border border-sand-300 rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none focus:border-gold-500 shadow-xs"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearError('password');
+                }}
+                placeholder={tab === 'register' ? 'Min 8 chars (letters & numbers)' : '••••••••'}
+                className={`w-full pl-10 pr-10 py-2.5 bg-[#FAF7F2] border rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none transition-colors shadow-xs ${
+                  fieldErrors.password ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20' : 'border-sand-300 focus:border-gold-500'
+                }`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(prev => !prev)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-forest-400 hover:text-forest-700"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
             </div>
+            {fieldErrors.password ? (
+              <p className="mt-1 text-[11px] text-rose-600 font-sans flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                <span>{fieldErrors.password}</span>
+              </p>
+            ) : tab === 'register' ? (
+              <p className="mt-1 text-[10px] text-forest-500">Minimum 8 characters with at least one letter and one number or symbol.</p>
+            ) : null}
           </div>
+
+          {tab === 'register' && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-forest-800 font-medium mb-1">
+                Confirm Password *
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-forest-500" />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    clearError('confirmPassword');
+                  }}
+                  placeholder="Repeat password"
+                  className={`w-full pl-10 pr-10 py-2.5 bg-[#FAF7F2] border rounded-2xl text-xs text-forest-950 placeholder:text-forest-400 focus:outline-none transition-colors shadow-xs ${
+                    fieldErrors.confirmPassword ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20' : 'border-sand-300 focus:border-gold-500'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(prev => !prev)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-forest-400 hover:text-forest-700"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              {fieldErrors.confirmPassword && (
+                <p className="mt-1 text-[11px] text-rose-600 font-sans flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                  <span>{fieldErrors.confirmPassword}</span>
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Primary Pill Button: Sign in → */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || socialLoading}
             className="w-full mt-3 py-3 bg-[#111827] hover:bg-forest-950 disabled:opacity-60 text-white rounded-full text-xs font-semibold tracking-wider transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-[0.99]"
           >
             {loading ? (
@@ -495,6 +648,7 @@ export default function SignIn() {
                   setTab('register');
                   setErrorMessage('');
                   setInfoMessage('');
+                  setFieldErrors({});
                 }}
                 className="font-bold text-forest-950 hover:underline ml-1"
               >
@@ -510,6 +664,7 @@ export default function SignIn() {
                   setTab('login');
                   setErrorMessage('');
                   setInfoMessage('');
+                  setFieldErrors({});
                 }}
                 className="font-bold text-forest-950 hover:underline ml-1"
               >

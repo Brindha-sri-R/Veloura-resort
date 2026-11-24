@@ -6,24 +6,60 @@ import generateToken from '../utils/generateToken.js';
 // @access  Public
 export const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, phone, country } = req.body;
+    const { name, email, password, confirmPassword, phone, country } = req.body;
 
-    if (!name || !email || !password) {
+    const trimmedName = typeof name === 'string' ? name.trim() : '';
+    const trimmedEmail = typeof email === 'string' ? email.toLowerCase().trim() : '';
+    const cleanPhone = typeof phone === 'string' ? phone.trim() : '';
+    const cleanCountry = typeof country === 'string' ? country.trim() : 'India';
+
+    if (!trimmedName || !trimmedEmail || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide full name, email address, and a password.'
+        message: 'Please provide full name, email address, and password.'
       });
     }
 
-    if (password.length < 6) {
+    if (trimmedName.length < 2) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long.'
+        message: 'Name must be at least 2 characters.'
       });
     }
 
-    const emailNormalized = email.toLowerCase().trim();
-    const existingUser = await User.findOne({ email: emailNormalized });
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address.'
+      });
+    }
+
+    // Password strength validation (min 8 chars, 1 letter, 1 number/symbol)
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long.'
+      });
+    }
+
+    if (!/[a-zA-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least one letter and one number or symbol.'
+      });
+    }
+
+    // Confirm password match check (if sent)
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match.'
+      });
+    }
+
+    const existingUser = await User.findOne({ email: trimmedEmail });
 
     if (existingUser) {
       return res.status(400).json({
@@ -33,11 +69,11 @@ export const registerUser = async (req, res, next) => {
     }
 
     const user = await User.create({
-      name: name.trim(),
-      email: emailNormalized,
+      name: trimmedName,
+      email: trimmedEmail,
       password,
-      phone: phone ? phone.trim() : '',
-      country: country ? country.trim() : 'India',
+      phone: cleanPhone,
+      country: cleanCountry,
       authProvider: 'local'
     });
 
@@ -70,14 +106,25 @@ export const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    const trimmedEmail = typeof email === 'string' ? email.toLowerCase().trim() : '';
+
+    if (!trimmedEmail || !password) {
       return res.status(400).json({
         success: false,
         message: 'Please provide both email and password.'
       });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email format.'
+      });
+    }
+
+    const user = await User.findOne({ email: trimmedEmail }).select('+password');
 
     if (!user) {
       return res.status(401).json({

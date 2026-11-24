@@ -10,6 +10,8 @@ const STORAGE_KEY = 'veloura_reservations_v1';
 export function BookingProvider({ children }) {
   // Stays collection (initialized with curated data, synced with MongoDB Atlas)
   const [stays, setStays] = useState(fallbackStays);
+  const [loadingStays, setLoadingStays] = useState(true);
+  const [staysError, setStaysError] = useState(null);
 
   // Default search parameters
   const [searchParams, setSearchParams] = useState({
@@ -37,6 +39,7 @@ export function BookingProvider({ children }) {
       return [];
     }
   });
+  const [loadingBookings, setLoadingBookings] = useState(false);
 
   // Toast / notification banner state
   const [toast, setToast] = useState(null);
@@ -49,23 +52,33 @@ export function BookingProvider({ children }) {
   }, []);
 
   // Fetch real stays from MongoDB Atlas on mount
-  useEffect(() => {
-    let isMounted = true;
-    api.getStays()
-      .then(res => {
-        if (isMounted && res.success && res.stays?.length > 0) {
-          setStays(res.stays);
-          setSelectedStay(prev => {
-            const matched = res.stays.find(s => s.id === prev.id || s.slug === prev.slug);
-            return matched || res.stays[0];
-          });
-        }
-      })
-      .catch(err => {
-        console.warn('Backend stays fetch fallback to offline dataset:', err.message);
-      });
-    return () => { isMounted = false; };
+  const loadStays = useCallback(async () => {
+    setLoadingStays(true);
+    setStaysError(null);
+    try {
+      const res = await api.getStays();
+      if (res.success && res.stays?.length > 0) {
+        setStays(res.stays);
+        setSelectedStay(prev => {
+          const matched = res.stays.find(s => s.id === prev.id || s.slug === prev.slug);
+          return matched || res.stays[0];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend stays fetch fallback to offline dataset:', err.message);
+      // Keep curated fallback stays so user always has luxury content
+      setStays(fallbackStays);
+    } finally {
+      // Simulate realistic smooth transition (350ms) to prevent layout shifts
+      setTimeout(() => {
+        setLoadingStays(false);
+      }, 350);
+    }
   }, []);
+
+  useEffect(() => {
+    loadStays();
+  }, [loadStays]);
 
   // Sync to localStorage whenever bookings change
   useEffect(() => {
@@ -78,6 +91,7 @@ export function BookingProvider({ children }) {
 
   // Fetch user reservations from MongoDB Atlas
   const refreshBookings = useCallback(async (email) => {
+    setLoadingBookings(true);
     try {
       const res = await api.getMyBookings(email);
       if (res.success && res.bookings) {
@@ -95,6 +109,10 @@ export function BookingProvider({ children }) {
       }
     } catch (err) {
       console.warn('Could not sync remote bookings from backend:', err.message);
+    } finally {
+      setTimeout(() => {
+        setLoadingBookings(false);
+      }, 300);
     }
   }, []);
 
@@ -295,6 +313,9 @@ export function BookingProvider({ children }) {
     <BookingContext.Provider
       value={{
         stays,
+        loadingStays,
+        staysError,
+        loadStays,
         searchParams,
         updateSearchParams,
         selectedStay,
@@ -303,6 +324,7 @@ export function BookingProvider({ children }) {
         setSelectedAddons,
         toggleAddon,
         bookings,
+        loadingBookings,
         refreshBookings,
         createBooking,
         simulatePayment,
