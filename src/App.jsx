@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BookingProvider } from './context/BookingContext';
@@ -13,17 +13,26 @@ import AuthModal from './components/AuthModal';
 import SignOutConfirmationModal from './components/SignOutConfirmationModal';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import Home from './pages/Home';
-import Stays from './pages/Stays';
-import StayDetails from './pages/StayDetails';
-import Experiences from './pages/Experiences';
-import About from './pages/About';
-import Contact from './pages/Contact';
-import BookingFlow from './pages/BookingFlow';
-import BookingConfirmation from './pages/BookingConfirmation';
-import MyBookings from './pages/MyBookings';
-import SignIn from './pages/SignIn';
-import NotFound from './pages/NotFound';
+// Code-split pages via React.lazy for optimal performance and chunking
+const Home = lazy(() => import('./pages/Home'));
+const Stays = lazy(() => import('./pages/Stays'));
+const StayDetails = lazy(() => import('./pages/StayDetails'));
+const Experiences = lazy(() => import('./pages/Experiences'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
+const BookingFlow = lazy(() => import('./pages/BookingFlow'));
+const BookingConfirmation = lazy(() => import('./pages/BookingConfirmation'));
+const MyBookings = lazy(() => import('./pages/MyBookings'));
+const SignIn = lazy(() => import('./pages/SignIn'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+function PageLoader() {
+  return (
+    <div className="min-h-[60vh] bg-[#FAF7F2] flex items-center justify-center pt-24" aria-busy="true">
+      <div className="w-8 h-8 border-2 border-gold-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -38,27 +47,29 @@ function AnimatedRoutes() {
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
         className="w-full flex-1 flex flex-col"
       >
-        <Routes location={location}>
-          <Route path="/" element={<Home />} />
-          <Route path="/stays" element={<Stays />} />
-          <Route path="/stay/:id" element={<StayDetails />} />
-          <Route path="/experiences" element={<Experiences />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/book" element={<BookingFlow />} />
-          <Route path="/confirmation/:reference" element={<BookingConfirmation />} />
-          <Route
-            path="/my-bookings"
-            element={
-              <ProtectedRoute>
-                <MyBookings />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/login" element={<SignIn />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes location={location}>
+            <Route path="/" element={<Home />} />
+            <Route path="/stays" element={<Stays />} />
+            <Route path="/stay/:id" element={<StayDetails />} />
+            <Route path="/experiences" element={<Experiences />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/book" element={<BookingFlow />} />
+            <Route path="/confirmation/:reference" element={<BookingConfirmation />} />
+            <Route
+              path="/my-bookings"
+              element={
+                <ProtectedRoute>
+                  <MyBookings />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/login" element={<SignIn />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   );
