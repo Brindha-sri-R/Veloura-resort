@@ -7,12 +7,14 @@ import {
 } from 'lucide-react';
 import { staysData } from '../data/staysData';
 import { useBooking } from '../context/BookingContext';
+import { useAuth } from '../context/AuthContext';
 import { formatCurrency, calculateNights, getTodayDateString } from '../utils/formatters';
 import { StayDetailsSkeleton } from '../components/SkeletonLoader';
 
 export default function StayDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { setSelectedStay, searchParams, updateSearchParams, showToast, stays, loadingStays } = useBooking();
 
   const stayList = stays && stays.length > 0 ? stays : staysData;
@@ -126,6 +128,16 @@ export default function StayDetails() {
       category: stay.category
     });
     setSelectedStay(stay);
+    if (!user) {
+      showToast('Please sign in to book your stay.', 'info');
+      navigate('/signin', {
+        state: {
+          from: { pathname: '/book', search: `?stayId=${stay.id}` },
+          message: 'Please sign in to book your stay.'
+        }
+      });
+      return;
+    }
     showToast(`Proceeding to reservation for ${stay.name}...`);
     navigate(`/book?stayId=${stay.id}`);
   };

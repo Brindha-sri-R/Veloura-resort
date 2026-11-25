@@ -47,6 +47,21 @@ export async function apiRequest(endpoint, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    // Notify AuthContext when an authenticated session is rejected (expired/invalid JWT)
+    if (
+      response.status === 401 &&
+      !endpoint.startsWith('/auth/login') &&
+      !endpoint.startsWith('/auth/register') &&
+      !endpoint.startsWith('/auth/google') &&
+      !endpoint.startsWith('/auth/apple')
+    ) {
+      window.dispatchEvent(
+        new CustomEvent('veloura:unauthorized', {
+          detail: { message: data.message || 'Session expired. Please sign in again.' }
+        })
+      );
+    }
+
     const error = new Error(data.message || `Request failed with status ${response.status}`);
     error.status = response.status;
     error.data = data;

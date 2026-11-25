@@ -26,7 +26,7 @@ export default function SignOutConfirmationModal() {
   const handleConfirm = () => {
     confirmSignOut(() => {
       showToast('You have been signed out successfully.', 'info');
-      navigate('/signin');
+      navigate('/', { replace: true });
     });
   };
 

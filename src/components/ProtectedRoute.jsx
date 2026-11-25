@@ -15,8 +15,17 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    // Preserve requested location so user can be returned after authentication
-    return <Navigate to="/signin" state={{ from: location }} replace />;
+    // Preserve requested location and show clear prompt on Sign In page
+    return (
+      <Navigate
+        to="/signin"
+        state={{
+          from: location,
+          message: 'Please sign in to continue.'
+        }}
+        replace
+      />
+    );
   }
 
   return children;

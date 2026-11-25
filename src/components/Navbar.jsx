@@ -167,6 +167,15 @@ export default function Navbar() {
                         </div>
 
                         <Link
+                          to="/profile"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-forest-800 hover:bg-sand-200/60 hover:text-forest-950 transition-colors"
+                        >
+                          <User className="w-3.5 h-3.5 text-gold-600" />
+                          <span>My Profile</span>
+                        </Link>
+
+                        <Link
                           to="/my-bookings"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2 px-4 py-2.5 text-forest-800 hover:bg-sand-200/60 hover:text-forest-950 transition-colors"
@@ -351,7 +360,21 @@ export default function Navbar() {
                 </NavLink>
               ))}
 
-              {/* My Reservations Link in Drawer (Shows actual saved count, zero if none) */}
+              {/* My Profile & My Reservations Links in Drawer */}
+              {user && (
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 text-base font-serif py-3 px-3 rounded-xl border-b border-white/5 transition-colors ${
+                      isActive ? 'text-gold bg-white/5 border-l-2 border-gold pl-4' : 'text-sand-100 hover:text-gold hover:bg-white/5'
+                    }`
+                  }
+                >
+                  <User className="w-4 h-4 text-gold" />
+                  <span>My Profile</span>
+                </NavLink>
+              )}
+
               <NavLink
                 to="/my-bookings"
                 className={({ isActive }) =>

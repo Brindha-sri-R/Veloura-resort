@@ -34,10 +34,15 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [infoMessage, setInfoMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState(
+    () => location.state?.message || (location.state?.from ? 'Please sign in to continue.' : '')
+  );
 
-  // Destination to return after successful login
-  const destination = location.state?.from?.pathname || '/';
+  // Destination to return after successful login (preserve pathname + query + hash)
+  const fromLocation = location.state?.from;
+  const destination = fromLocation
+    ? `${fromLocation.pathname || '/'}${fromLocation.search || ''}${fromLocation.hash || ''}`
+    : '/';
 
   // If already authenticated, redirect to destination
   useEffect(() => {

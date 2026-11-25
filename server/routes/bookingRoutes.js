@@ -8,17 +8,17 @@ import {
   getBookingByReference,
   cancelBooking
 } from '../controllers/bookingController.js';
-import { optionalAuth } from '../middleware/authMiddleware.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', optionalAuth, createBooking);
-router.post('/simulate-payment', simulatePayment);
-router.post('/verify', verifyPayment);
-router.get('/my', optionalAuth, getMyBookings);
-router.get('/lookup', lookupBooking);
-router.get('/:reference', getBookingByReference);
-router.patch('/:reference/cancel', optionalAuth, cancelBooking);
+router.post('/', protect, createBooking);
+router.post('/simulate-payment', protect, simulatePayment);
+router.post('/verify', protect, verifyPayment);
+router.get('/my', protect, getMyBookings);
+router.get('/lookup', protect, lookupBooking);
+router.get('/:reference', protect, getBookingByReference);
+router.patch('/:reference/cancel', protect, cancelBooking);
 
 export default router;
 

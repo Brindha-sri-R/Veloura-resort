@@ -23,6 +23,7 @@ const Contact = lazy(() => import('./pages/Contact'));
 const BookingFlow = lazy(() => import('./pages/BookingFlow'));
 const BookingConfirmation = lazy(() => import('./pages/BookingConfirmation'));
 const MyBookings = lazy(() => import('./pages/MyBookings'));
+const Profile = lazy(() => import('./pages/Profile'));
 const SignIn = lazy(() => import('./pages/SignIn'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -55,13 +56,35 @@ function AnimatedRoutes() {
             <Route path="/experiences" element={<Experiences />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/book" element={<BookingFlow />} />
-            <Route path="/confirmation/:reference" element={<BookingConfirmation />} />
+            <Route
+              path="/book"
+              element={
+                <ProtectedRoute>
+                  <BookingFlow />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/confirmation/:reference"
+              element={
+                <ProtectedRoute>
+                  <BookingConfirmation />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/my-bookings"
               element={
                 <ProtectedRoute>
                   <MyBookings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               }
             />

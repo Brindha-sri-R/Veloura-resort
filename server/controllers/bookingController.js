@@ -2,6 +2,15 @@ import Booking from '../models/Booking.js';
 import Stay from '../models/Stay.js';
 import generateBookingReference from '../utils/generateReference.js';
 
+// Helper: Verify that the authenticated user owns this booking
+const isBookingOwner = (booking, user) => {
+  if (!booking || !user) return false;
+  if (booking.user) {
+    return booking.user.toString() === user._id.toString();
+  }
+  return booking.guest?.email?.toLowerCase() === user.email?.toLowerCase();
+};
+
 // Helper: Calculate nights between YYYY-MM-DD strings in local/UTC dates
 const calculateNights = (inDate, outDate) => {
   if (!inDate || !outDate) return 1;
@@ -192,6 +201,13 @@ export const simulatePayment = async (req, res, next) => {
       });
     }
 
+    if (!isBookingOwner(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to process payment for this reservation.'
+      });
+    }
+
     if (actualOutcome === 'failure') {
       booking.payment.status = 'failed';
       booking.payment.method = actualMethod;
@@ -229,31 +245,24 @@ export const simulatePayment = async (req, res, next) => {
 // Alias verifyPayment to simulatePayment for backward compatibility
 export const verifyPayment = simulatePayment;
 
-// @desc    Get bookings for authenticated user or by guest email query
+// @desc    Get bookings for authenticated user
 // @route   GET /api/bookings/my
-// @access  Public / Optional Auth
+// @access  Private
 export const getMyBookings = async (req, res, next) => {
   try {
-    let query = null;
-
-    if (req.user) {
-      query = {
-        $or: [
-          { user: req.user._id },
-          { 'guest.email': req.user.email.toLowerCase() }
-        ]
-      };
-    } else if (req.query.email) {
-      query = {
-        'guest.email': req.query.email.trim().toLowerCase()
-      };
-    } else {
-      return res.status(200).json({
-        success: true,
-        count: 0,
-        bookings: []
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required to view reservations.'
       });
     }
+
+    const query = {
+      $or: [
+        { user: req.user._id },
+        { 'guest.email': req.user.email.toLowerCase() }
+      ]
+    };
 
     const bookings = await Booking.find(query).sort({ createdAt: -1 });
 
@@ -267,12 +276,12 @@ export const getMyBookings = async (req, res, next) => {
   }
 };
 
-// @desc    Lookup booking by reference & guest email
+// @desc    Lookup booking by reference for authenticated owner
 // @route   GET /api/bookings/lookup
-// @access  Public
+// @access  Private
 export const lookupBooking = async (req, res, next) => {
   try {
-    const { reference, email } = req.query;
+    const { reference } = req.query;
     if (!reference) {
       return res.status(400).json({
         success: false,
@@ -280,17 +289,19 @@ export const lookupBooking = async (req, res, next) => {
       });
     }
 
-    const query = { reference: reference.toUpperCase() };
-    if (email) {
-      query['guest.email'] = email.trim().toLowerCase();
-    }
-
-    const booking = await Booking.findOne(query);
+    const booking = await Booking.findOne({ reference: reference.toUpperCase() });
 
     if (!booking) {
       return res.status(404).json({
         success: false,
         message: `Reservation ${reference} was not found.`
+      });
+    }
+
+    if (!isBookingOwner(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this reservation.'
       });
     }
 
@@ -305,7 +316,7 @@ export const lookupBooking = async (req, res, next) => {
 
 // @desc    Get single reservation voucher by reference
 // @route   GET /api/bookings/:reference
-// @access  Public
+// @access  Private
 export const getBookingByReference = async (req, res, next) => {
   try {
     const { reference } = req.params;
@@ -315,6 +326,13 @@ export const getBookingByReference = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: `Reservation ${reference} was not found.`
+      });
+    }
+
+    if (!isBookingOwner(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this reservation.'
       });
     }
 
@@ -329,7 +347,7 @@ export const getBookingByReference = async (req, res, next) => {
 
 // @desc    Cancel a reservation
 // @route   PATCH /api/bookings/:reference/cancel
-// @access  Public (Optionally authenticated)
+// @access  Private
 export const cancelBooking = async (req, res, next) => {
   try {
     const { reference } = req.params;
@@ -339,6 +357,13 @@ export const cancelBooking = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: `Reservation ${reference} was not found.`
+      });
+    }
+
+    if (!isBookingOwner(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to cancel this reservation.'
       });
     }
 

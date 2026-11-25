@@ -4,15 +4,27 @@ import { motion } from 'framer-motion';
 import { Users, Maximize, Star, BedDouble, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 import { useBooking } from '../context/BookingContext';
+import { useAuth } from '../context/AuthContext';
 import { luxuryEase } from '../utils/motion';
 
 export default function StayCard({ stay, featured = false, index = null }) {
   const navigate = useNavigate();
-  const { setSelectedStay } = useBooking();
+  const { user } = useAuth();
+  const { setSelectedStay, showToast } = useBooking();
 
   const handleBookNow = (e) => {
     e.stopPropagation();
     setSelectedStay(stay);
+    if (!user) {
+      showToast('Please sign in to book your stay.', 'info');
+      navigate('/signin', {
+        state: {
+          from: { pathname: '/book', search: `?stayId=${stay.id}` },
+          message: 'Please sign in to book your stay.'
+        }
+      });
+      return;
+    }
     navigate(`/book?stayId=${stay.id}`);
   };
 

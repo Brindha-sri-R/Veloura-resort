@@ -89,6 +89,20 @@ export function BookingProvider({ children }) {
     }
   }, [bookings]);
 
+  // Clear cached bookings when user signs out or session expires
+  useEffect(() => {
+    const handleClearBookings = () => {
+      setBookings([]);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.error('Failed to clear bookings cache', e);
+      }
+    };
+    window.addEventListener('veloura:logout', handleClearBookings);
+    return () => window.removeEventListener('veloura:logout', handleClearBookings);
+  }, []);
+
   // Fetch user reservations from MongoDB Atlas
   const refreshBookings = useCallback(async (email) => {
     setLoadingBookings(true);
@@ -169,6 +183,10 @@ export function BookingProvider({ children }) {
         };
       }
     } catch (err) {
+      if (err.status === 401 || err.status === 403) {
+        showToast(err.message || 'Please sign in to create a reservation.', 'error');
+        throw err;
+      }
       console.warn('Backend reservation creation fell back to local handler:', err.message);
     }
 
@@ -236,6 +254,10 @@ export function BookingProvider({ children }) {
         return res.booking;
       }
     } catch (err) {
+      if (err.status === 401 || err.status === 403) {
+        showToast(err.message || 'Please sign in to complete payment simulation.', 'error');
+        throw err;
+      }
       console.warn('Simulation fallback:', err.message);
       if (verificationData.simulationOutcome === 'failure') {
         setBookings(prev =>
@@ -273,6 +295,10 @@ export function BookingProvider({ children }) {
     try {
       await api.cancelBooking(reference);
     } catch (err) {
+      if (err.status === 401 || err.status === 403) {
+        showToast(err.message || 'Not authorized to cancel this reservation.', 'error');
+        return;
+      }
       console.warn('Backend cancel failed, updating locally:', err.message);
     }
 

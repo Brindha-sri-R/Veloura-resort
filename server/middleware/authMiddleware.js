@@ -21,6 +21,9 @@ export const protect = async (req, res, next) => {
       return next();
     } catch (error) {
       res.status(401);
+      if (error.name === 'TokenExpiredError') {
+        return next(new Error('Session expired. Please sign in again.'));
+      }
       return next(new Error('Not authorized, token failed verification'));
     }
   }

@@ -112,8 +112,17 @@ export function AuthProvider({ children }) {
 
     verifyToken();
 
+    // Clear session if any API call returns 401 Unauthorized (expired/invalid token)
+    const handleUnauthorized = () => {
+      if (isMounted) {
+        logout();
+      }
+    };
+    window.addEventListener('veloura:unauthorized', handleUnauthorized);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('veloura:unauthorized', handleUnauthorized);
     };
   }, []);
 
@@ -198,12 +207,24 @@ export function AuthProvider({ children }) {
     throw new Error(response.message || 'Apple authentication failed');
   };
 
+  const updateProfile = async (profileData) => {
+    const response = await api.updateMe(profileData);
+    if (response.success && response.user) {
+      setUser(response.user);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
+      return response;
+    }
+    throw new Error(response.message || 'Could not update profile');
+  };
+
   const logout = () => {
     setAuthToken(null);
     setToken(null);
     setUser(null);
     try {
       localStorage.removeItem(USER_STORAGE_KEY);
+      localStorage.removeItem('veloura_reservations_v1');
+      window.dispatchEvent(new Event('veloura:logout'));
     } catch (e) {
       console.error(e);
     }
@@ -229,6 +250,7 @@ export function AuthProvider({ children }) {
         register,
         googleLogin,
         appleLogin,
+        updateProfile,
         logout
       }}
     >
